@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Overlay proof of concept. No network access, no launcher entry; driven from scripts/sports.sh. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Fire OS 8 has no UI for this; it is granted over ADB (appops), and the grant only sticks
+         when the APK declares it. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name">
+
+        <!-- Exported so `adb shell am start-foreground-service` can reach it. PoC only: it shows or hides
+             a static test bar and reads nothing. A real build should guard it with a signature permission. -->
+        <service
+            android:name=".TickerService"
+            android:exported="true" />
+    </application>
+</manifest>

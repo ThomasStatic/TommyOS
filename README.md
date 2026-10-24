@@ -11,6 +11,7 @@ Findings, package classification and decisions: [PLAN.md](PLAN.md).
 | 23 Amazon packages | `pm disable-user --user 0` (never uninstalled) | `scripts/restore.sh` |
 | Lumen app (`app.lumen.home`) | Installed; no permissions | `scripts/restore.sh` (uninstalls) |
 | Home button | Secure settings `enabled_accessibility_services` (orig `null`) and `accessibility_enabled` (orig `0`) | `scripts/restore.sh` |
+| Lumen Sports PoC (`app.lumen.sports`) | Overlay feasibility test 2026-10-24; **currently uninstalled**. When installed: app-op `SYSTEM_ALERT_WINDOW` (orig `default`). See [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
 
 Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinking`. Re-enabled by Fire OS at boot (left on): `com.amazon.vizzini`.
 
@@ -36,6 +37,8 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 | `scripts/launcher.sh install\|open\|enable-redirect\|disable-redirect\|uninstall\|status` | Lumen management, logged | Yes |
 | `scripts/restore.sh [--dry-run]` | **Full rollback** | Yes |
 | `launcher/build.sh` | Build signed Lumen APK | No (PC only) |
+| `scripts/sports.sh install\|grant\|show [opacity] [scroll]\|opacity <0-1>\|hide\|revoke\|status\|diag\|shot <label>\|uninstall` | Lumen Sports overlay PoC management, logged | Yes |
+| `sports/build.sh` | Build the Sports PoC APK (Lumen's signing key) | No (PC only) |
 
 ## Complete rollback procedure
 

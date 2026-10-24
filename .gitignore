@@ -16,3 +16,10 @@ backup/
 
 # Design-review screenshots (large; regenerate with scripts/screens.sh)
 screens/
+
+# Lumen Sports PoC build output
+sports/local.properties
+sports/build/
+sports/app/build/
+sports/.gradle/
+sports/.kotlin/
