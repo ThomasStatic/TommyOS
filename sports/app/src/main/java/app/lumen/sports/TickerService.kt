@@ -4,38 +4,81 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import java.io.File
+import java.time.Instant
+import java.time.ZoneId
 
 /**
- * Shows [TickerView] along the bottom edge in a TYPE_APPLICATION_OVERLAY window.
+ * Shows the fantasy ticker along the bottom edge in a TYPE_APPLICATION_OVERLAY window and keeps it
+ * fed from ESPN.
  *
  * The window is never focusable or touchable, so remote keys keep going to the app underneath.
- * It runs as a foreground service so low-memory kills during 4K playback are unlikely, and it is
- * START_NOT_STICKY: if it is killed anyway (or the TV restarts) it stays off until asked again.
+ * [LeagueFetcher] runs on its own thread, only while the ticker is shown and the screen is on; the
+ * ticker draws the cached snapshot immediately and never blanks on network errors. Foreground
+ * service so low-memory kills during 4K playback are unlikely; START_NOT_STICKY and no boot
+ * receiver, so after a kill or restart it stays off until asked. The manifest limits callers to
+ * `adb shell` (and this app).
  *
  * Control (see scripts/sports.sh):
- *   am start-foreground-service -n app.lumen.sports/.TickerService [-a app.lumen.sports.SHOW]
- *       [--ef opacity 0.0-1.0] [--ez scroll true|false]
+ *   am start-foreground-service -n app.lumen.sports/.TickerService [--ef opacity 0.0-1.0]
  *   am start-foreground-service -n app.lumen.sports/.TickerService -a app.lumen.sports.HIDE
  */
 class TickerService : Service() {
-    private val handler = Handler(Looper.getMainLooper())
+    private val main = Handler(Looper.getMainLooper())
+    private lateinit var worker: Handler
+    private lateinit var workerThread: HandlerThread
+    private lateinit var cache: SnapshotCache
+    private lateinit var credentials: Credentials
     private var view: TickerView? = null
     private var params: WindowManager.LayoutParams? = null
+    private var screenReceiver: BroadcastReceiver? = null
 
-    private val heartbeat = object : Runnable {
+    // Main thread: what the ticker currently shows.
+    private var snapshot: Snapshot? = null
+    private var message: String? = null
+
+    // Written on the main thread, read by the worker before it schedules the next poll.
+    @Volatile private var screenOn = true
+    // Written by the worker, read when rendering: data older than this is labelled "as of".
+    @Volatile private var staleAfterMs = TickerItems.STALE_MS
+
+    // Worker thread only.
+    private var fetcher: LeagueFetcher? = null
+    private var failures = 0
+
+    private val poll = Runnable { pollOnce() }
+    private val resetFailures = Runnable { failures = 0 }
+
+    /** Re-renders once a minute so the "as of" label appears when data goes stale. */
+    private val tick = object : Runnable {
         override fun run() {
-            view?.let { Log.i(TAG, "heartbeat shown=${it.isShown} window=${it.windowVisibility} frames=${it.takeFrames()} alpha=${params?.alpha}") }
-            handler.postDelayed(this, HEARTBEAT_MS)
+            render()
+            view?.let { Log.i(TAG, "heartbeat shown=${it.isShown} window=${it.windowVisibility} frames=${it.takeFrames()}") }
+            main.postDelayed(this, TICK_MS)
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        running = true
+        cache = SnapshotCache(File(noBackupFilesDir, "snapshot.json"))
+        credentials = Credentials(this)
+        workerThread = HandlerThread("espn").apply { start() }
+        worker = Handler(workerThread.looper)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -43,22 +86,34 @@ class TickerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Every startForegroundService() call must be answered with startForeground(), even HIDE.
         startForeground(NOTIFICATION_ID, notification())
-        if (intent?.action == ACTION_HIDE) {
-            Log.i(TAG, "hide requested")
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_HIDE -> {
+                Log.i(TAG, "hide requested")
+                stopSelf()
+            }
+            ACTION_REFRESH -> if (view != null) restartPolling() else stopSelf()
+            else -> {
+                if (view == null) {
+                    if (!show()) { stopSelf(); return START_NOT_STICKY }
+                    snapshot = cache.load()
+                    render()
+                    main.postDelayed(tick, TICK_MS)
+                    screenOn = getSystemService(PowerManager::class.java).isInteractive
+                    registerScreenReceiver()
+                    restartPolling()
+                }
+                if (intent?.hasExtra(EXTRA_OPACITY) == true) setOpacity(intent.getFloatExtra(EXTRA_OPACITY, DEFAULT_OPACITY))
+            }
         }
-        if (view == null && !show()) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        if (intent?.hasExtra(EXTRA_OPACITY) == true) setOpacity(intent.getFloatExtra(EXTRA_OPACITY, DEFAULT_OPACITY))
-        if (intent?.hasExtra(EXTRA_SCROLL) == true) view?.scrolling = intent.getBooleanExtra(EXTRA_SCROLL, true)
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(heartbeat)
+        running = false
+        main.removeCallbacksAndMessages(null)
+        worker.removeCallbacksAndMessages(null)
+        workerThread.quitSafely()
+        screenReceiver?.let { unregisterReceiver(it) }
         view?.let { v -> try { windowManager().removeView(v) } catch (_: Exception) {} }
         view = null
         Log.i(TAG, "removed")
@@ -67,6 +122,76 @@ class TickerService : Service() {
 
     override fun onTrimMemory(level: Int) {
         Log.i(TAG, "trim memory level=$level")
+    }
+
+    // --- Fetching (worker thread) ---
+
+    /** Fetches now and resumes the schedule, if the screen is on. Main thread. */
+    private fun restartPolling() {
+        worker.removeCallbacks(poll)
+        if (!screenOn) return
+        worker.post(resetFailures)
+        worker.post(poll)
+    }
+
+    private fun pollOnce() {
+        val creds = credentials.load()
+        if (creds == null) {
+            publish(null, "Not signed in to ESPN   run scripts/sports.sh auth on the PC")
+            return // AuthReceiver restarts polling once credentials arrive.
+        }
+        val f = fetcher?.takeIf { it.creds == creds } ?: LeagueFetcher(creds, cache.load()?.week).also { fetcher = it }
+        try {
+            val result = f.fetch(Instant.now())
+            if (!running) return // Hidden while the request was in flight.
+            cache.save(result)
+            failures = 0
+            publish(result, null)
+            Log.i(TAG, "fetched week ${result.week}: ${result.others.size + (if (result.mine != null) 1 else 0)} matchups, ${result.livePlayers.size} live players")
+        } catch (e: EspnClient.AuthException) {
+            Log.w(TAG, "fetch: ${e.message}")
+            publish(null, "ESPN sign-in expired   run scripts/sports.sh auth on the PC")
+            return // No retries with bad credentials.
+        } catch (e: Exception) {
+            failures++
+            Log.w(TAG, "fetch failed ($failures in a row): $e")
+            if (failures >= UNAVAILABLE_AFTER) publish(null, "ESPN scores unavailable   retrying")
+        }
+        val delay = PollPolicy.nextDelayMs(Instant.now(), f.kickoffs, failures)
+        staleAfterMs = maxOf(TickerItems.STALE_MS, 2 * delay)
+        // A screen-off that arrived during the request already cleared the queue; don't re-arm.
+        if (running && screenOn) worker.postDelayed(poll, delay)
+    }
+
+    /** Hands a fetch result (or a status message) to the main thread. */
+    private fun publish(newSnapshot: Snapshot?, newMessage: String?) = main.post {
+        if (newSnapshot != null) snapshot = newSnapshot
+        message = newMessage
+        render()
+    }
+
+    // --- Rendering (main thread) ---
+
+    private fun render() {
+        val v = view ?: return
+        val s = snapshot
+        val items = ArrayList<TickerItem>()
+        message?.let { items += TickerItem(it, emphasis = true) }
+        if (s != null) items += TickerItems.from(s, Instant.now(), ZoneId.systemDefault(), staleAfterMs)
+        if (items.isEmpty()) items += TickerItem("Loading ESPN fantasy scores…")
+        v.setItems(items)
+    }
+
+    private fun registerScreenReceiver() {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                screenOn = intent.action == Intent.ACTION_SCREEN_ON
+                Log.i(TAG, if (screenOn) "screen on: polling resumed" else "screen off: polling paused")
+                if (screenOn) restartPolling() else worker.removeCallbacks(poll)
+            }
+        }
+        registerReceiver(r, IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON) })
+        screenReceiver = r
     }
 
     private fun show(): Boolean {
@@ -91,7 +216,6 @@ class TickerService : Service() {
             windowManager().addView(v, p)
             view = v
             params = p
-            handler.postDelayed(heartbeat, HEARTBEAT_MS)
             Log.i(TAG, "shown")
             true
         } catch (e: Exception) {
@@ -124,13 +248,23 @@ class TickerService : Service() {
     companion object {
         private const val TAG = "LumenSports"
         const val ACTION_HIDE = "app.lumen.sports.HIDE"
+        const val ACTION_REFRESH = "app.lumen.sports.REFRESH"
         const val EXTRA_OPACITY = "opacity"
-        const val EXTRA_SCROLL = "scroll"
         const val WINDOW_TITLE = "LumenSportsTicker"
         private const val CHANNEL = "ticker"
         private const val NOTIFICATION_ID = 1
         private const val HEIGHT_DP = 44
         private const val DEFAULT_OPACITY = 0.9f
-        private const val HEARTBEAT_MS = 30_000L
+        private const val TICK_MS = 60_000L
+        /** Consecutive failures before an empty ticker says ESPN is unavailable (cached scores stay up regardless). */
+        private const val UNAVAILABLE_AFTER = 3
+
+        /** True while the service exists in this process; lets [AuthReceiver] avoid starting it. */
+        @Volatile private var running = false
+
+        fun refreshIfRunning(context: Context) {
+            if (!running) return
+            context.startForegroundService(Intent(context, TickerService::class.java).setAction(ACTION_REFRESH))
+        }
     }
 }

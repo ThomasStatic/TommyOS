@@ -11,7 +11,7 @@ Findings, package classification and decisions: [PLAN.md](PLAN.md).
 | 23 Amazon packages | `pm disable-user --user 0` (never uninstalled) | `scripts/restore.sh` |
 | Lumen app (`app.lumen.home`) | Installed; no permissions | `scripts/restore.sh` (uninstalls) |
 | Home button | Secure settings `enabled_accessibility_services` (orig `null`) and `accessibility_enabled` (orig `0`) | `scripts/restore.sh` |
-| Lumen Sports PoC (`app.lumen.sports`) | Overlay feasibility test 2026-10-24; **currently uninstalled**. When installed: app-op `SYSTEM_ALERT_WINDOW` (orig `default`). See [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
+| Lumen Sports (`app.lumen.sports`) | ESPN fantasy ticker overlay; installed with app-op `SYSTEM_ALERT_WINDOW` = `allow` (orig `default`); ESPN cookies, once `auth` runs, stored encrypted on the TV (uninstall deletes them). Off unless shown; off after reboot. See [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
 
 Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinking`. Re-enabled by Fire OS at boot (left on): `com.amazon.vizzini`.
 
@@ -37,8 +37,9 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 | `scripts/launcher.sh install\|open\|enable-redirect\|disable-redirect\|uninstall\|status` | Lumen management, logged | Yes |
 | `scripts/restore.sh [--dry-run]` | **Full rollback** | Yes |
 | `launcher/build.sh` | Build signed Lumen APK | No (PC only) |
-| `scripts/sports.sh install\|grant\|show [opacity] [scroll]\|opacity <0-1>\|hide\|revoke\|status\|diag\|shot <label>\|uninstall` | Lumen Sports overlay PoC management, logged | Yes |
-| `sports/build.sh` | Build the Sports PoC APK (Lumen's signing key) | No (PC only) |
+| `scripts/sports.sh install\|grant\|revoke\|auth\|sign-out\|show [opacity]\|opacity <0-1>\|hide\|refresh\|status\|diag\|shot <label>\|uninstall` | Lumen Sports management, logged. `auth` sends the cookies in `sports/espn-auth.properties` (git-ignored) to the TV | Yes |
+| `scripts/sports.sh espn-dump [dir]` | Raw ESPN responses for parser fixtures, saved outside the repo | No (PC only) |
+| `sports/build.sh`, `sports/test.sh [TestClass]` | Build the Sports APK (Lumen's signing key); run its JVM unit tests | No (PC only) |
 
 ## Complete rollback procedure
 

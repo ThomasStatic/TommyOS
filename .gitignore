@@ -23,3 +23,6 @@ sports/build/
 sports/app/build/
 sports/.gradle/
 sports/.kotlin/
+
+# ESPN login cookies for scripts/sports.sh auth (espn_s2, SWID). Never commit.
+sports/espn-auth.properties

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Lumen Sports overlay proof of concept: install, overlay app-op, show/hide, diagnostics.
+# Lumen Sports (ESPN fantasy ticker overlay): install, overlay app-op, ESPN sign-in, show/hide, diagnostics.
 # Changes are logged to state/applied.log (the app-op with its previous mode) so scripts/restore.sh can undo them.
-# Usage: scripts/sports.sh install | grant | revoke | show [opacity] [scroll] | opacity <0-1> | hide
-#                          | status | diag | shot <label> | uninstall
+# Usage: scripts/sports.sh install | grant | revoke | auth | sign-out | show [opacity] | opacity <0-1> | hide
+#                          | refresh | status | diag | shot <label> | espn-dump [dir] | uninstall
+# ESPN credentials come from sports/espn-auth.properties (git-ignored): espn_s2=..., SWID={...}, optional league=<id>.
+# They are passed on stdin, never as command-line arguments, and never printed.
 set -u
 ADB="${ADB:-/c/Users/PC/AppData/Local/Microsoft/WinGet/Packages/Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe/platform-tools/adb.exe}"
 TV="${TV:-10.0.0.213:5555}"
@@ -12,15 +14,29 @@ APK="$ROOT/sports/app/build/outputs/apk/release/app-release.apk"
 PKG=app.lumen.sports
 SVC="$PKG/.TickerService"
 OP=SYSTEM_ALERT_WINDOW
+AUTH_FILE="$ROOT/sports/espn-auth.properties"
+DEFAULT_LEAGUE=2061761840
 export MSYS_NO_PATHCONV=1
 mkdir -p "$ROOT/state"
 sh_() { "$ADB" -s "$TV" shell "$@" < /dev/null 2>&1 | tr -d '\r'; }
 log() { echo "$(date -Iseconds) $*" >> "$LOG"; }
-[ "$("$ADB" -s "$TV" get-state 2>&1)" = "device" ] || { echo "TV $TV not connected"; exit 1; }
+# espn-dump only talks to ESPN, so it doesn't need the TV.
+[ "${1:-}" = espn-dump ] || [ "$("$ADB" -s "$TV" get-state 2>&1)" = "device" ] || { echo "TV $TV not connected"; exit 1; }
 
 # Current app-op mode: allow | ignore | deny | default (no entry = default).
 op_mode() { sh_ appops get "$PKG" "$OP" | sed -n "s/^$OP: \([a-z]*\).*/\1/p" | head -1 | grep . || echo default; }
 installed() { sh_ pm list packages "$PKG" | grep -qx "package:$PKG"; }
+
+# Reads the auth file into S2 / SWID / LEAGUE, validating the shapes (cookie values are URL-safe, no quotes).
+read_auth() {
+  [ -f "$AUTH_FILE" ] || { echo "missing $AUTH_FILE (espn_s2=..., SWID={...})"; exit 1; }
+  S2="$(sed -n 's/^espn_s2=//p' "$AUTH_FILE" | tr -d '\r\n ')"
+  SWID="$(sed -n 's/^SWID=//p' "$AUTH_FILE" | tr -d '\r\n ')"
+  LEAGUE="$(sed -n 's/^league=//p' "$AUTH_FILE" | tr -d '\r\n ')"; LEAGUE="${LEAGUE:-$DEFAULT_LEAGUE}"
+  [[ "$S2" =~ ^[A-Za-z0-9%+/=_.-]+$ ]] || { echo "espn_s2 missing or has unexpected characters"; exit 1; }
+  [[ "$SWID" =~ ^\{[0-9A-Fa-f-]{36}\}$ ]] || { echo "SWID must look like {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"; exit 1; }
+  [[ "$LEAGUE" =~ ^[0-9]+$ ]] || { echo "league must be numeric"; exit 1; }
+}
 
 case "${1:-status}" in
   install)
@@ -39,10 +55,23 @@ case "${1:-status}" in
     sh_ appops set "$PKG" "$OP" "${orig:-default}"
     log "appop-restored $PKG $OP ${orig:-default}"
     echo "  appop $OP -> $(op_mode)" ;;
+  auth)
+    installed || { echo "not installed"; exit 1; }
+    read_auth
+    # The command goes to the TV's shell on stdin, so the cookie never appears in a PC process list.
+    result="$(printf "am broadcast -n %s/.AuthReceiver -a %s.AUTH --es league '%s' --es espn_s2 '%s' --es swid '%s'\n" \
+        "$PKG" "$PKG" "$LEAGUE" "$S2" "$SWID" | "$ADB" -s "$TV" shell 2>&1 | tr -d '\r' | grep -o 'result=[0-9]*')"
+    case "$result" in
+      result=1) echo "  saved on the TV (encrypted)"; log "auth $PKG league $LEAGUE" ;;
+      result=2) echo "  REJECTED by the TV: check the values in $AUTH_FILE"; exit 1 ;;
+      *) echo "  no answer from the TV (${result:-none})"; exit 1 ;;
+    esac ;;
+  sign-out)
+    sh_ am broadcast -n "$PKG/.AuthReceiver" -a "$PKG.SIGN_OUT" | grep -q 'result=1' && echo "  credentials deleted from the TV" && log "sign-out $PKG" ;;
   show)
-    args=(-n "$SVC" --ef opacity "${2:-0.9}")
-    [ -n "${3:-}" ] && args+=(--ez scroll "$3")
-    sh_ am start-foreground-service "${args[@]}" ;;
+    sh_ am start-foreground-service -n "$SVC" --ef opacity "${2:-0.9}" ;;
+  refresh)
+    sh_ am start-foreground-service -n "$SVC" -a "$PKG.REFRESH" ;;
   opacity)
     sh_ am start-foreground-service -n "$SVC" --ef opacity "${2:?opacity 0-1}" ;;
   hide)
@@ -61,6 +90,26 @@ case "${1:-status}" in
   shot)
     dir="$ROOT/screens/sports-poc"; mkdir -p "$dir"
     "$ADB" -s "$TV" exec-out screencap -p > "$dir/${2:?label}.png" && echo "$dir/$2.png" ;;
+  espn-dump)
+    # Raw ESPN responses for building parser fixtures. Saved outside the repo: they name league members.
+    read_auth
+    out="${2:-$ROOT/../espn-dump}"; mkdir -p "$out"
+    season="$(date +%Y)"; [ "$(date +%-m)" -lt 3 ] && season=$((season - 1))
+    base="https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/$season"
+    # curl reads the cookie from a config on stdin (-K -), so it never appears in a process list.
+    fetch() { # url outfile [x-fantasy-filter JSON]
+      {
+        printf 'header = "Cookie: espn_s2=%s; SWID=%s"\n' "$S2" "$SWID"
+        [ -n "${3:-}" ] && printf 'header = "x-fantasy-filter: %s"\n' "${3//\"/\\\"}"
+      } | curl -s --compressed -K - -o "$2" -w "  %{http_code} %{size_download}B $(basename "$2")\n" "$1"
+    }
+    fetch "$base/segments/0/leagues/$LEAGUE?view=mStatus&view=mSettings" "$out/status.json"
+    period="$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['status']['currentMatchupPeriod'])" "$out/status.json" 2>/dev/null)"
+    echo "  season $season, matchup period ${period:-?}"
+    fetch "$base/segments/0/leagues/$LEAGUE?view=mMatchupScore&view=mScoreboard&view=mTeam&view=mSettings&view=mStatus" \
+      "$out/league.json" "{\"schedule\":{\"filterMatchupPeriodIds\":{\"value\":[${period:-1}]}}}"
+    fetch "$base?view=proTeamSchedules_wl" "$out/proschedule.json"
+    echo "  saved in $out" ;;
   uninstall)
     sh_ pm uninstall "$PKG" && log "uninstall $PKG" ;;
   *) echo "unknown command"; exit 2 ;;

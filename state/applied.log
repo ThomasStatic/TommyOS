@@ -77,3 +77,6 @@ java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftva
 2026-10-24T16:25:26-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
 2026-10-24T16:31:44-04:00 appop-restored app.lumen.sports SYSTEM_ALERT_WINDOW default
 2026-10-24T16:31:46-04:00 uninstall app.lumen.sports
+2026-10-24T17:02:30-04:00 install app.lumen.sports eb085fff12365dac
+2026-10-24T17:02:31-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T17:12:19-04:00 install app.lumen.sports 6331915d06f323a5

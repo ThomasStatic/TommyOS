@@ -84,7 +84,13 @@ TSN itself uses ~40 % of a core and 310–330 MB RSS. The device signals `TRIM_M
 
 Never rely on revoking to `default` alone to hide it.
 
-## Stage 2 proposal: ESPN Fantasy Football (not implemented)
+## Stage 2: ESPN Fantasy Football (in progress)
+
+Implemented in `sports/` (see the code's KDoc); unit-tested at four seams (`EspnParser`, `TickerItems`, `PollPolicy`, `SnapshotCache`; synthetic fixtures). **Not yet verified against the live API**: waiting on credentials. Deferred: Lumen toggle (needs a signature permission on the service, which is DUMP-guarded for now), edge choice, auto mode. Known limitation: a player stays "live" until 4 h after kickoff (ESPN's schedule view has no game status).
+
+The original proposal follows.
+
+### Proposal
 
 **Data source.** ESPN's undocumented league API, which community clients reach as `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/segments/0/leagues/{leagueId}?view=mMatchupScore&view=mScoreboard&view=mTeam&scoringPeriodId={week}`. Re-verify the host and views when stage 2 starts. Public leagues need no credentials. Private leagues need the `espn_s2` and `SWID` cookies from a logged-in browser. Treat the API as breakable: one parser module with tolerant JSON handling and a visible "data unavailable" state.
 

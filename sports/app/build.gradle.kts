@@ -49,4 +49,19 @@ android {
     kotlinOptions { jvmTarget = "17" }
 
     lint { checkReleaseBuilds = false }
+
+    testOptions.unitTests.all {
+        // test.sh runs Gradle with -q, so failures are logged at the quiet level.
+        it.testLogging.quiet {
+            events("failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+    }
+}
+
+dependencies {
+    // Plain-JVM tests of the ESPN parsing, ticker text, polling and cache logic. Android's own
+    // org.json is a stub off-device, so tests use the real library.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
