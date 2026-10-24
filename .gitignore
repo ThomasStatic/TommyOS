@@ -1,0 +1,18 @@
+# Secrets: Lumen's signing key. Keep it on this PC (and backed up privately); never commit it.
+*.jks
+*.keystore
+launcher/keystore.properties
+launcher/local.properties
+
+# Build output
+launcher/build/
+launcher/app/build/
+launcher/.gradle/
+launcher/.kotlin/
+*.apk
+
+# Device snapshots from discover.sh/verify.sh: full dumpsys, getprop and logcat with device identifiers
+backup/
+
+# Design-review screenshots (large; regenerate with scripts/screens.sh)
+screens/

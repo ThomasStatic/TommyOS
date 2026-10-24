@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cinema: a light top fade for the clock, a deeper bottom fade under the dock, neutral black only.
+     Scene wallpapers already fall off at the bottom, so this stays gentle and lets them breathe. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <gradient
+                android:angle="270"
+                android:centerColor="#14000000"
+                android:centerY="0.30"
+                android:endColor="#00000000"
+                android:startColor="#73000000" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <gradient
+                android:angle="90"
+                android:centerColor="#4D000000"
+                android:centerY="0.36"
+                android:endColor="#00000000"
+                android:startColor="#CC000000" />
+        </shape>
+    </item>
+</layer-list>

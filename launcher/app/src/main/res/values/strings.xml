@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lumen</string>
+    <string name="redirect_label">Lumen Home button</string>
+    <string name="redirect_desc">Shows Lumen instead of the Amazon home screen when you press Home. It only sees which screen opened and cannot read anything on screen. Lumen has no network access.</string>
+    <string name="section_system">Inputs &amp; Settings</string>
+    <string name="section_apps">All Apps</string>
+    <string name="section_apps_title">Apps</string>
+</resources>

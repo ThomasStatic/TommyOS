@@ -1,0 +1,71 @@
+2026-10-22T17:53:34-04:00 disable com.amazon.storm.lightning.tutorial
+2026-10-22T17:53:40-04:00 enable com.amazon.storm.lightning.tutorial (restore)
+2026-10-22T18:02:50-04:00 disable com.amazon.storm.lightning.tutorial
+2026-10-22T18:02:51-04:00 disable com.amazon.tmm.tutorial
+2026-10-22T18:02:52-04:00 disable com.amazon.tv.acr
+2026-10-22T18:02:54-04:00 disable com.amazon.minitv.android.app
+2026-10-22T18:02:55-04:00 disable com.amazon.tv.earlyaccess
+2026-10-22T18:02:56-04:00 disable com.amazon.tv.democontent.provider
+2026-10-22T18:02:57-04:00 disable com.amazon.shoptv.client
+2026-10-22T18:02:58-04:00 disable com.amazon.hybridadidservice
+2026-10-22T18:03:00-04:00 disable com.amazon.wirelessmetrics.service
+2026-10-22T18:03:01-04:00 disable com.amazon.device.telemetry.emitter
+2026-10-22T18:03:02-04:00 disable com.amazon.kso.blackbird
+2026-10-22T18:13:07-04:00 disable com.amazon.sneakpeek
+2026-10-22T18:13:16-04:00 disable com.amazon.logan
+2026-10-22T18:13:26-04:00 REFUSED com.amazon.diode :: 
+Exception occurred while executing 'disable-user':
+java.lang.SecurityException: Cannot disable a protected package: com.amazon.diode
+	at com.android.server.pm.PackageManagerService.setEnabledSetting(PackageManagerService.java:21465)
+	at com.android.server.pm.PackageManagerService.setApplicationEnabledSetting(PackageManagerService.java:21297)
+	at com.android.server.pm.PackageManagerShellCommand.runSetEnabledSetting(PackageManagerShellCommand.java:2151)
+	at com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:233)
+	at android.os.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:98)
+	at android.os.ShellCommand.exec(ShellCommand.java:44)
+	at com.android.server.pm.PackageManagerService.onShellCommand(PackageManagerService.java:22117)
+	at android.os.Binder.shellCommand(Binder.java:929)
+	at android.os.Binder.onTransact(Binder.java:813)
+	at android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4603)
+	at com.android.server.pm.PackageManagerService.onTransact(PackageManagerService.java:4388)
+	at android.os.Binder.execTransactInternal(Binder.java:1159)
+	at android.os.Binder.execTransact(Binder.java:1123)
+2026-10-22T18:13:27-04:00 disable com.amazon.perfcollection
+2026-10-22T18:13:37-04:00 disable com.amazon.neo.minerva.logcat
+2026-10-22T18:13:47-04:00 disable com.amazon.neo.minerva
+2026-10-22T18:13:57-04:00 REFUSED com.amazon.ftvads.deeplinking :: 
+Exception occurred while executing 'disable-user':
+java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftvads.deeplinking
+	at com.android.server.pm.PackageManagerService.setEnabledSetting(PackageManagerService.java:21465)
+	at com.android.server.pm.PackageManagerService.setApplicationEnabledSetting(PackageManagerService.java:21297)
+	at com.android.server.pm.PackageManagerShellCommand.runSetEnabledSetting(PackageManagerShellCommand.java:2151)
+	at com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:233)
+	at android.os.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:98)
+	at android.os.ShellCommand.exec(ShellCommand.java:44)
+	at com.android.server.pm.PackageManagerService.onShellCommand(PackageManagerService.java:22117)
+	at android.os.Binder.shellCommand(Binder.java:929)
+	at android.os.Binder.onTransact(Binder.java:813)
+	at android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4603)
+	at com.android.server.pm.PackageManagerService.onTransact(PackageManagerService.java:4388)
+	at android.os.Binder.execTransactInternal(Binder.java:1159)
+	at android.os.Binder.execTransact(Binder.java:1123)
+2026-10-22T18:14:05-04:00 disable com.amazon.tv.channelscan
+2026-10-22T18:14:17-04:00 disable com.amazon.smarthomemapviewapp
+2026-10-22T18:14:29-04:00 disable com.amazon.tv.matter
+2026-10-22T18:14:41-04:00 disable com.amazon.tv.mattercohost
+2026-10-22T18:14:52-04:00 disable com.amazon.tv.alexaalerts
+2026-10-22T18:15:04-04:00 disable com.amazon.tv.alexanotifications
+2026-10-22T18:15:16-04:00 disable com.amazon.alexadirectivebrokerservice
+2026-10-22T18:15:27-04:00 disable com.amazon.vizzini
+2026-10-22T18:24:43-04:00 enable com.amazon.vizzini (REVERTED BY FIRE OS during boot at 22:19-22:20 UTC; enabled=1 explicit; enforcer not identifiable without root)
+2026-10-22T18:46:21-04:00 install app.lumen.home d551e2b4247e5e79
+2026-10-22T18:48:45-04:00 install app.lumen.home b6bacb6f0583254a
+2026-10-22T18:52:19-04:00 setting secure enabled_accessibility_services null
+2026-10-22T18:52:19-04:00 setting secure accessibility_enabled 0 (corrected: original 0 per Phase 1 backup; Android auto-set 1 when the service was added)
+2026-10-22T18:55:42-04:00 install app.lumen.home 84265639481945ce
+2026-10-22T19:11:21-04:00 install app.lumen.home 5b056f1d6c78851b
+2026-10-22T20:06:44-04:00 install app.lumen.home 869f67f487bd5b10
+2026-10-22T20:28:21-04:00 install app.lumen.home 157e924f577ef911
+2026-10-22T20:30:24-04:00 install app.lumen.home b818f9d7a5585824
+2026-10-22T20:46:36-04:00 install app.lumen.home 67fdf0430c518143
+2026-10-22T20:48:57-04:00 install app.lumen.home 7fa9a97785bc89db
+2026-10-22T20:53:14-04:00 install app.lumen.home 3d23b361ba5f33f3
