@@ -4,7 +4,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 
-/** Fixtures in src/test/resources/espn are synthetic, shaped like ESPN's lm-api-reads responses. */
+/**
+ * Fixtures in src/test/resources/espn are synthetic, shaped like ESPN's lm-api-reads responses
+ * (checked against a real response for this league on 2026-10-24: slots 0-17 and 23 FLEX start,
+ * 20 bench, 21 IR; starters' appliedStatTotal sums to the team's totalPointsLive).
+ */
 class EspnParserTest {
     private val league = resource("espn/league.json")
     private val you = "{AAAAAAAA-0000-0000-0000-000000000001}"
@@ -37,7 +41,7 @@ class EspnParserTest {
         val s = EspnParser.snapshot(league, you, kickoffs, now)
 
         assertEquals(
-            listOf(PlayerLine("Josh Allen", "QB", 21.42), PlayerLine("Saquon Barkley", "RB", 12.0), PlayerLine("Bills D/ST", "D/ST", 4.0)),
+            listOf(PlayerLine("Josh Allen", "QB", 21.42), PlayerLine("Saquon Barkley", "RB", 12.0), PlayerLine("Flex Starter", "TE", 6.5), PlayerLine("Bills D/ST", "D/ST", 4.0)),
             s.livePlayers,
         )
         assertEquals(emptyList<PlayerLine>(), EspnParser.snapshot(league, you, kickoffs, Instant.parse("2026-10-25T21:01:00Z").plusSeconds(3600)).livePlayers.filter { it.name == "Josh Allen" })

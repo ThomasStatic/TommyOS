@@ -27,6 +27,8 @@
             "player": { "fullName": "Josh Allen", "proTeamId": 2, "defaultPositionId": 1 } } },
           { "playerId": 102, "lineupSlotId": 2, "playerPoolEntry": { "appliedStatTotal": 12.0,
             "player": { "fullName": "Saquon Barkley", "proTeamId": 21, "defaultPositionId": 2 } } },
+          { "playerId": 106, "lineupSlotId": 23, "playerPoolEntry": { "appliedStatTotal": 6.5,
+            "player": { "fullName": "Flex Starter", "proTeamId": 21, "defaultPositionId": 4 } } },
           { "playerId": 103, "lineupSlotId": 4, "playerPoolEntry": { "appliedStatTotal": 0.0,
             "player": { "fullName": "Late Kickoff", "proTeamId": 25, "defaultPositionId": 3 } } },
           { "playerId": 104, "lineupSlotId": 20, "playerPoolEntry": { "appliedStatTotal": 9.5,

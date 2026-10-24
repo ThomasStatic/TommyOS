@@ -84,9 +84,23 @@ TSN itself uses ~40 % of a core and 310–330 MB RSS. The device signals `TRIM_M
 
 Never rely on revoking to `default` alone to hide it.
 
-## Stage 2: ESPN Fantasy Football (in progress)
+## Stage 2: ESPN Fantasy Football
 
-Implemented in `sports/` (see the code's KDoc); unit-tested at four seams (`EspnParser`, `TickerItems`, `PollPolicy`, `SnapshotCache`; synthetic fixtures). **Not yet verified against the live API**: waiting on credentials. Deferred: Lumen toggle (needs a signature permission on the service, which is DUMP-guarded for now), edge choice, auto mode. Known limitation: a player stays "live" until 4 h after kickoff (ESPN's schedule view has no game status).
+Implemented in `sports/` (see the code's KDoc); unit-tested at four seams (`EspnParser`, `TickerItems`, `PollPolicy`, `SnapshotCache`; synthetic fixtures).
+
+**Verified against the live API on 2026-10-24** (league 2061761840, week 7, 14 teams):
+- `lm-api-reads.fantasy.espn.com` with the `espn_s2` + `SWID` cookies returns 200; without them, `401 AUTH_LEAGUE_NOT_VISIBLE`.
+- The `x-fantasy-filter` header limits the schedule to the current week (7 matchups, 94 KB).
+- Your team is found from `SWID` in `teams[].owners`.
+- Starters' `appliedStatTotal` (every slot except 20 bench and 21 IR) sums exactly to each team's `totalPointsLive`.
+- NFL kickoffs: `proGamesByScoringPeriod` covers 33 teams across 18 weeks.
+- On the TV, the first fetch took under a second, and the ticker showed all 7 matchups on one page (emoji team abbreviations render).
+
+**Deferred:**
+- The Lumen toggle. It needs a signature permission on the service, which is DUMP-guarded for now.
+- Edge choice and auto mode.
+
+**Known limitation:** a player stays "live" until 4 h after kickoff. Each NFL game has a `statsOfficial` flag (true for Thursday's finished game, false for Sunday's), which could end that early. Its lag after the final whistle is unknown, and using it would mean re-reading the schedule during games, so it's not used yet.
 
 The original proposal follows.
 
