@@ -21,6 +21,7 @@ class TickerItemsTest {
     private fun live(name: String, pos: String, pts: Double) = PlayerLine(name, pos, pts, null, Game.LIVE)
     private fun played(name: String, pos: String, pts: Double) = PlayerLine(name, pos, pts, null, Game.PLAYED)
     private fun upcoming(name: String, pos: String, proj: Double?) = PlayerLine(name, pos, 0.0, proj, Game.UPCOMING)
+    private fun bye(name: String, pos: String) = PlayerLine(name, pos, 0.0, null, Game.BYE)
 
     @Test
     fun `your matchup leads with both full team names and projections`() {
@@ -37,14 +38,14 @@ class TickerItemsTest {
     }
 
     @Test
-    fun `players come live, then played, then to play, yours before theirs, each group on a new page`() {
+    fun `players come live, then played, then to play, then on a bye, yours before theirs, each group on a new page`() {
         val you = listOf(
             live("Josh Allen", "QB", 21.42),
             upcoming("Late Kickoff", "WR", 14.24),
             played("Thursday Guy", "TE", 9.0),
             live("Saquon Barkley", "RB", 12.0),
         )
-        val them = listOf(live("Rival Back", "RB", 3.1), upcoming("Bye Player", "TE", null))
+        val them = listOf(live("Rival Back", "RB", 3.1), upcoming("No Projection", "TE", null), bye("Bye Player", "WR"))
 
         val items = TickerItems.from(snapshot(mine = mine(you, them)), now = fetched, zone = zone)
 
@@ -54,10 +55,20 @@ class TickerItemsTest {
                 TickerItem("ABC live   R. Back RB 3.1"),
                 TickerItem("TOM played   T. Guy TE 9.0", newPage = true),
                 TickerItem("TOM to play   L. Kickoff WR proj 14.2", newPage = true),
-                TickerItem("ABC to play   B. Player TE"),
+                TickerItem("ABC to play   N. Projection TE"),
+                TickerItem("ABC on bye   B. Player WR", newPage = true),
             ),
             items.drop(1),
         )
+    }
+
+    @Test
+    fun `without the NFL schedule each team's starters are listed with their points`() {
+        val you = listOf(PlayerLine("Josh Allen", "QB", 21.42, 18.0, Game.UNKNOWN), PlayerLine("Late Kickoff", "WR", 0.0, 14.24, Game.UNKNOWN))
+
+        val items = TickerItems.from(snapshot(mine = mine(you)), now = fetched, zone = zone)
+
+        assertEquals(listOf(TickerItem("TOM starters   J. Allen QB 21.4   ·   L. Kickoff WR 0.0", newPage = true)), items.drop(1))
     }
 
     @Test
@@ -115,11 +126,11 @@ class TickerItemsTest {
     }
 
     @Test
-    fun `a bye week is said first and the league still follows`() {
+    fun `no matchup of your own is said first and the league still follows`() {
         val others = listOf(Matchup(Side("DEF", 87.1, null), Side("GHI", 90.3, null), final = false))
 
         val items = TickerItems.from(snapshot(mine = null, others = others), now = fetched, zone = zone)
 
-        assertEquals(listOf(TickerItem("Week 8   Bye week", emphasis = true), TickerItem("DEF 87.1 – 90.3 GHI", newPage = true)), items)
+        assertEquals(listOf(TickerItem("Week 8   No matchup this week", emphasis = true), TickerItem("DEF 87.1 – 90.3 GHI", newPage = true)), items)
     }
 }

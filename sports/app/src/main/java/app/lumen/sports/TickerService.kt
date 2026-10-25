@@ -14,7 +14,6 @@ import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
-import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
@@ -67,7 +66,6 @@ class TickerService : Service() {
     private val tick = object : Runnable {
         override fun run() {
             render()
-            view?.let { Log.i(TAG, "heartbeat shown=${it.isShown} window=${it.windowVisibility} frames=${it.takeFrames()}") }
             main.postDelayed(this, TICK_MS)
         }
     }
@@ -75,7 +73,7 @@ class TickerService : Service() {
     override fun onCreate() {
         super.onCreate()
         running = true
-        cache = SnapshotCache(File(noBackupFilesDir, "snapshot.json"))
+        cache = cache(this)
         credentials = Credentials(this)
         workerThread = HandlerThread("espn").apply { start() }
         worker = Handler(workerThread.looper)
@@ -120,10 +118,6 @@ class TickerService : Service() {
         super.onDestroy()
     }
 
-    override fun onTrimMemory(level: Int) {
-        Log.i(TAG, "trim memory level=$level")
-    }
-
     // --- Fetching (worker thread) ---
 
     /** Fetches now and resumes the schedule, if the screen is on. Main thread. */
@@ -137,7 +131,8 @@ class TickerService : Service() {
     private fun pollOnce() {
         val creds = credentials.load()
         if (creds == null) {
-            publish(null, "Not signed in to ESPN   run scripts/sports.sh auth on the PC")
+            cache.clear() // Again here: a fetch in flight during sign-out may have saved after AuthReceiver cleared it.
+            publish(null, "Not signed in to ESPN   run scripts/sports.sh auth on the PC", clearScores = true)
             return // AuthReceiver restarts polling once credentials arrive.
         }
         val f = fetcher?.takeIf { it.creds == creds } ?: LeagueFetcher(creds, cache.load()?.week).also { fetcher = it }
@@ -164,9 +159,9 @@ class TickerService : Service() {
         if (running && screenOn) worker.postDelayed(poll, delay)
     }
 
-    /** Hands a fetch result (or a status message) to the main thread. */
-    private fun publish(newSnapshot: Snapshot?, newMessage: String?) = main.post {
-        if (newSnapshot != null) snapshot = newSnapshot
+    /** Hands a fetch result (or a status message) to the main thread. [clearScores] drops the shown scores (signed out). */
+    private fun publish(newSnapshot: Snapshot?, newMessage: String?, clearScores: Boolean = false) = main.post {
+        if (newSnapshot != null || clearScores) snapshot = newSnapshot
         message = newMessage
         render()
     }
@@ -196,8 +191,6 @@ class TickerService : Service() {
     }
 
     private fun show(): Boolean {
-        val allowed = Settings.canDrawOverlays(this)
-        Log.i(TAG, "canDrawOverlays=$allowed")
         val v = TickerView(this)
         val p = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -262,6 +255,9 @@ class TickerService : Service() {
 
         /** True while the service exists in this process; lets [AuthReceiver] avoid starting it. */
         @Volatile private var running = false
+
+        /** The last good scores, shared with [AuthReceiver] so signing out forgets them. */
+        fun cache(context: Context) = SnapshotCache(File(context.noBackupFilesDir, "snapshot.json"))
 
         fun refreshIfRunning(context: Context) {
             if (!running) return

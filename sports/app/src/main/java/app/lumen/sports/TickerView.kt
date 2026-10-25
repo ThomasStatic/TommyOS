@@ -48,11 +48,6 @@ class TickerView(context: Context) : View(context) {
     private var fade = 1f
     private var fader: ValueAnimator? = null
 
-    var frames = 0
-        private set
-
-    fun takeFrames(): Int = frames.also { frames = 0 }
-
     private val advance = object : Runnable {
         override fun run() {
             if (pages.size > 1) {
@@ -107,7 +102,6 @@ class TickerView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        frames++
         val w = width.toFloat()
         val h = height.toFloat()
         canvas.drawRect(0f, 0f, w, h, bg)

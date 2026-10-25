@@ -12,6 +12,11 @@ import java.io.File
 class SnapshotCache(private val file: File) {
     fun save(snapshot: Snapshot) = writeAtomically(file, toJson(snapshot).toString())
 
+    /** Forgets the saved scores (on sign-out). */
+    fun clear() {
+        file.delete()
+    }
+
     /** Null when there is no usable snapshot (never saved, or damaged); the ticker then waits for a fetch. */
     fun load(): Snapshot? = try {
         fromJson(JSONObject(file.readText()))
@@ -28,7 +33,7 @@ class SnapshotCache(private val file: File) {
     private fun matchupJson(m: Matchup) = JSONObject().put("left", sideJson(m.left)).put("right", sideJson(m.right)).put("final", m.final)
 
     private fun sideJson(s: Side) = JSONObject()
-        .put("team", s.team).put("name", s.name).put("pts", s.points).put("proj", s.projected ?: JSONObject.NULL)
+        .put("abbrev", s.abbrev).put("name", s.name).put("pts", s.points).put("proj", s.projected ?: JSONObject.NULL)
         .put("starters", JSONArray(s.starters.map(::playerJson)))
 
     private fun playerJson(p: PlayerLine) = JSONObject()
@@ -44,9 +49,11 @@ class SnapshotCache(private val file: File) {
     private fun matchup(o: JSONObject) = Matchup(side(o.getJSONObject("left")), side(o.getJSONObject("right")), o.getBoolean("final"))
 
     private fun side(o: JSONObject) = Side(
-        o.getString("team"), o.getDouble("pts"), proj(o), o.getString("name"),
-        o.getJSONArray("starters").objects().map { PlayerLine(it.getString("name"), it.getString("pos"), it.getDouble("pts"), proj(it), Game.valueOf(it.getString("game"))) },
+        o.getString("abbrev"), o.getDouble("pts"), proj(o), o.getString("name"), o.getJSONArray("starters").objects().map(::playerLine),
     )
+
+    private fun playerLine(o: JSONObject) =
+        PlayerLine(o.getString("name"), o.getString("pos"), o.getDouble("pts"), proj(o), Game.valueOf(o.getString("game")))
 
     private fun proj(o: JSONObject) = if (o.isNull("proj")) null else o.getDouble("proj")
 }

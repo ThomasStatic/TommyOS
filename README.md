@@ -45,13 +45,14 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 
 1. On the TV, make sure **Settings → My Fire TV → Developer Options → ADB Debugging** is on (it survives reboots on this TV).
 2. On the PC: `bash scripts/restore.sh --dry-run` and review the list.
-3. `bash scripts/restore.sh` — restores both accessibility settings to their original values, uninstalls Lumen, re-enables every package this project disabled (newest first), and verifies each.
+3. `bash scripts/restore.sh` — restores both accessibility settings to their original values, restores Lumen Sports' overlay app-op and uninstalls it (its stored ESPN cookies go with it), uninstalls Lumen, re-enables every package this project disabled (newest first), and verifies each.
 4. Reboot the TV (`adb -s 10.0.0.213:5555 reboot`), then `bash scripts/verify.sh` — every package should report `expected=enabled ok`.
 5. Optional, in the TV's Settings UI: re-enable the privacy options you turned off, and turn off ADB Debugging / Developer Options.
 
 **If ADB is unavailable** (e.g. Developer Options reset by an update):
 - Home button: in the Lumen tile → "Show Lumen when Home is pressed" → Off (always available). Fire TV's Settings → Accessibility may also list "Lumen Home button" (not verified on this build).
 - Lumen: Settings → Applications → Manage Installed Applications → Lumen → Uninstall.
+- Lumen Sports ticker: Settings → Applications → Manage Installed Applications → Lumen Sports → Force stop (hides it until next shown) or Uninstall (also deletes its ESPN cookies).
 - Disabled packages: Settings → Applications → Manage Installed Applications → *app* → Enable (shown for most; otherwise re-enable ADB and run restore).
 - Last resort (erases everything, **only with your decision**): factory reset restores all Amazon packages and settings.
 

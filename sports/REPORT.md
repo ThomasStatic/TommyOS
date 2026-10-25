@@ -80,7 +80,7 @@ TSN itself uses ~40 % of a core and 310–330 MB RSS. The device signals `TRIM_M
 3. *Off:* the `HIDE` action removes the window and stops the service.
 4. *Emergency, from the PC:* `appops set app.lumen.sports SYSTEM_ALERT_WINDOW ignore` hides it immediately whatever the app does.
 5. *Emergency, without the PC:* Settings → Applications → Lumen Sports → Force stop.
-6. *Remove:* hide, then revoke to `default`, then uninstall (`scripts/restore.sh` does this).
+6. *Remove:* hide, then revoke to `default`, then uninstall. `scripts/restore.sh` restores the logged app-op and uninstalls; uninstalling removes the window too.
 
 Never rely on revoking to `default` alone to hide it.
 
@@ -102,7 +102,8 @@ Implemented in `sports/` (see the code's KDoc); unit-tested at four seams (`Espn
 
 **Matchup detail (2026-10-25).** The ticker now pages through, in order:
 1. Your matchup, with both full team names (`teams[].name`) and projections.
-2. Both teams' starters, grouped as live, played, then still to play (yours before your opponent's). Each group starts a new page, and long groups split 3 players at a time.
+2. Both teams' starters, grouped as live, played, still to play, then on a bye (yours before your opponent's). Each group starts a new page, and long groups split 3 players at a time.
+   - If the NFL schedule can't be read, game state is unknown: each team's starters are listed together with their points.
    - Players still to play show ESPN's weekly projection: the `stats` entry with `statSourceId` 1, `statSplitTypeId` 1 and the current scoring period.
 3. The rest of the league, abbreviated, starting a new page.
 

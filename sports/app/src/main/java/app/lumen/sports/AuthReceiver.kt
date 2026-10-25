@@ -8,7 +8,7 @@ import android.util.Log
 /**
  * Receives the ESPN league ID and cookies from `scripts/sports.sh auth`. The manifest guards it with
  * android.permission.DUMP, which `adb shell` holds and ordinary apps can't, so no app on the TV can
- * plant or overwrite credentials. Values are never logged.
+ * plant or overwrite credentials. Values are never logged. Signing out also forgets the saved scores.
  *
  *   am broadcast -n app.lumen.sports/.AuthReceiver -a app.lumen.sports.AUTH \
  *       --es league <id> --es espn_s2 <cookie> --es swid <{...}>
@@ -32,6 +32,7 @@ class AuthReceiver : BroadcastReceiver() {
             }
             ACTION_SIGN_OUT -> {
                 creds.clear()
+                TickerService.cache(context).clear()
                 Log.i(TAG, "signed out")
             }
             else -> return

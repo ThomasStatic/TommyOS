@@ -42,7 +42,7 @@ class EspnParserTest {
     }
 
     @Test
-    fun `both sides' starters are in lineup order and marked live, played or still to play`() {
+    fun `both sides' starters are in lineup order and marked live, played, to play or on a bye`() {
         val s = EspnParser.snapshot(league, you, kickoffs, now)
 
         assertEquals(
@@ -60,10 +60,18 @@ class EspnParserTest {
                 PlayerLine("Sunday Night", "QB", 0.0, 18.04, Game.UPCOMING),
                 PlayerLine("Rival Back", "RB", 3.1, null, Game.LIVE),
                 PlayerLine("Thursday Starter", "WR", 17.3, null, Game.PLAYED),
-                PlayerLine("Bye Player", "TE", 0.0, null, Game.UPCOMING),
+                PlayerLine("Bye Player", "TE", 0.0, null, Game.BYE),
             ),
             s.mine!!.right.starters,
         )
+    }
+
+    @Test
+    fun `without the NFL schedule every starter keeps their points but no game state`() {
+        val s = EspnParser.snapshot(league, you, kickoffs = null, now = now)
+
+        assertEquals(setOf(Game.UNKNOWN), (s.mine!!.left.starters + s.mine!!.right.starters).map { it.game }.toSet())
+        assertEquals(21.42, s.mine!!.left.starters.first().points, 0.0)
     }
 
     @Test

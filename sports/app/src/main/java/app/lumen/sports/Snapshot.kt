@@ -18,19 +18,19 @@ data class Snapshot(
 data class Matchup(val left: Side, val right: Side, val final: Boolean)
 
 /**
- * One team in a matchup: its short [team] name and full [name], live points and live projection
+ * One team in a matchup: its [abbrev] and full [name], live points and live projection
  * (if ESPN gives one). [starters] in lineup order, filled in for your matchup only.
  */
 data class Side(
-    val team: String,
+    val abbrev: String,
     val points: Double,
     val projected: Double?,
-    val name: String = team,
+    val name: String = abbrev,
     val starters: List<PlayerLine> = emptyList(),
 )
 
 /** One starter: this week's points so far, this week's projection (if ESPN gives one) and where their NFL game is. */
 data class PlayerLine(val name: String, val position: String, val points: Double, val projected: Double?, val game: Game)
 
-/** Where a player's NFL game is this week. A player on a bye, or with an unknown kickoff, is [UPCOMING]. */
-enum class Game { LIVE, PLAYED, UPCOMING }
+/** Where a player's NFL game is this week. [UNKNOWN] when the NFL schedule couldn't be read. */
+enum class Game { LIVE, PLAYED, UPCOMING, BYE, UNKNOWN }

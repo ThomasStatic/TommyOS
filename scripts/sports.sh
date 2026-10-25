@@ -4,7 +4,8 @@
 # Usage: scripts/sports.sh install | grant | revoke | auth | sign-out | show [opacity] | opacity <0-1> | hide
 #                          | refresh | status | diag | shot <label> | espn-dump [dir] | uninstall
 # ESPN credentials come from sports/espn-auth.properties (git-ignored): espn_s2=..., SWID={...}, optional league=<id>.
-# They are passed on stdin, never as command-line arguments, and never printed.
+# They go to the TV on stdin (never on a PC command line) and are never printed. On the TV, `am` holds them as
+# arguments for the moment it runs; Android hides other processes' arguments from apps (hidepid), so only the shell sees them.
 set -u
 ADB="${ADB:-/c/Users/PC/AppData/Local/Microsoft/WinGet/Packages/Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe/platform-tools/adb.exe}"
 TV="${TV:-10.0.0.213:5555}"
@@ -58,7 +59,7 @@ case "${1:-status}" in
   auth)
     installed || { echo "not installed"; exit 1; }
     read_auth
-    # The command goes to the TV's shell on stdin, so the cookie never appears in a PC process list.
+    # The command goes to the TV's shell on stdin, so the cookie never appears in a PC process list (see the header for the TV side).
     result="$(printf "am broadcast -n %s/.AuthReceiver -a %s.AUTH --es league '%s' --es espn_s2 '%s' --es swid '%s'\n" \
         "$PKG" "$PKG" "$LEAGUE" "$S2" "$SWID" | "$ADB" -s "$TV" shell 2>&1 | tr -d '\r' | grep -o 'result=[0-9]*')"
     case "$result" in

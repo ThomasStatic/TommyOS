@@ -31,7 +31,7 @@ class LeagueFetcher(val creds: Credentials.Value, startWeek: Int?) {
         }
         val teamKickoffs = schedule.kickoffs(season, EspnParser.scoringPeriod(league), now)
         kickoffs = teamKickoffs?.values?.distinct()
-        return EspnParser.snapshot(league, creds.swid, teamKickoffs.orEmpty(), now)
+        return EspnParser.snapshot(league, creds.swid, teamKickoffs, now)
     }
 
     /** The NFL season schedule, fetched at most every [MAX_AGE_MS] (or [RETRY_MS] after a failure). */
