@@ -23,6 +23,16 @@ awk '$2=="setting" && $3=="secure" && !seen[$4]++ {print $4, $5}' "$LOG" | while
   echo "secure $key restored to $old"
   echo "$(date -Iseconds) setting-restored secure $key $old" >> "$LOG"
 done
+# --- Lumen Sports: uninstalling also clears its app-op; restore the logged mode first in case uninstall fails ---
+if grep -q " install app.lumen.sports" "$LOG" && "$ADB" -s "$TV" shell pm list packages app.lumen.sports < /dev/null | grep -q app.lumen.sports; then
+  awk '$2=="appop" && !seen[$3" "$4]++ {print $3, $4, $5}' "$LOG" | while read -r pkg op old; do
+    if [ "$DRY" = "--dry-run" ]; then echo "would restore appop $pkg $op -> $old"; continue; fi
+    "$ADB" -s "$TV" shell appops set "$pkg" "$op" "$old" < /dev/null
+    echo "$(date -Iseconds) appop-restored $pkg $op $old" >> "$LOG"
+  done
+  if [ "$DRY" = "--dry-run" ]; then echo "would uninstall app.lumen.sports"
+  else "$ADB" -s "$TV" shell pm uninstall app.lumen.sports < /dev/null | tr -d '\r'; echo "$(date -Iseconds) uninstall app.lumen.sports (restore)" >> "$LOG"; fi
+fi
 if grep -q " install app.lumen.home" "$LOG" && "$ADB" -s "$TV" shell pm list packages app.lumen.home < /dev/null | grep -q app.lumen.home; then
   if [ "$DRY" = "--dry-run" ]; then echo "would uninstall app.lumen.home"
   else "$ADB" -s "$TV" shell pm uninstall app.lumen.home < /dev/null | tr -d '\r'; echo "$(date -Iseconds) uninstall app.lumen.home (restore)" >> "$LOG"; fi

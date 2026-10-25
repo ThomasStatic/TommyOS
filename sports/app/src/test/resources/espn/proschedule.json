@@ -1,0 +1,15 @@
+{
+  "settings": {
+    "proTeams": [
+      { "id": 2, "abbrev": "Buf", "proGamesByScoringPeriod": {
+          "7": [ { "id": 7002, "date": 1792342800000, "homeProTeamId": 2, "awayProTeamId": 15, "scoringPeriodId": 7, "startTimeTBD": false, "statsOfficial": true, "validForLocking": true } ],
+          "8": [ { "id": 8002, "date": 1792947600000, "homeProTeamId": 21, "awayProTeamId": 2, "scoringPeriodId": 8, "startTimeTBD": false, "statsOfficial": false, "validForLocking": true } ] } },
+      { "id": 21, "abbrev": "Phi", "proGamesByScoringPeriod": {
+          "8": [ { "id": 8002, "date": 1792947600000, "homeProTeamId": 21, "awayProTeamId": 2, "scoringPeriodId": 8, "startTimeTBD": false, "statsOfficial": false, "validForLocking": true } ] } },
+      { "id": 25, "abbrev": "SF", "proGamesByScoringPeriod": {
+          "8": [ { "id": 8025, "date": 1792959900000, "homeProTeamId": 25, "awayProTeamId": 9, "scoringPeriodId": 8, "startTimeTBD": false, "statsOfficial": false, "validForLocking": true } ] } },
+      { "id": 30, "abbrev": "Jax", "byeWeek": 8, "proGamesByScoringPeriod": {} },
+      { "id": 0, "abbrev": "FA" }
+    ]
+  }
+}

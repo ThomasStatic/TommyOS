@@ -1,0 +1,131 @@
+package app.lumen.sports
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import java.time.Instant
+
+/**
+ * Fixtures in src/test/resources/espn are synthetic, shaped like ESPN's lm-api-reads responses
+ * (checked against a real response for this league on 2026-10-24: slots 0-17 and 23 FLEX start,
+ * 20 bench, 21 IR; starters' appliedStatTotal sums to the team's totalPointsLive).
+ */
+class EspnParserTest {
+    private val league = resource("espn/league.json")
+    private val you = "{AAAAAAAA-0000-0000-0000-000000000001}"
+    private val now = Instant.parse("2026-10-25T18:30:00Z")
+
+    private val kickoffs = mapOf(
+        2 to Instant.parse("2026-10-25T17:00:00Z"),   // under way: Allen, the bench player, Bills D/ST
+        21 to Instant.parse("2026-10-25T17:00:00Z"),  // under way: Barkley, the flex, Rival Back, the IR player
+        9 to Instant.parse("2026-10-23T00:15:00Z"),   // Thursday night, long over
+        25 to Instant.parse("2026-10-25T20:25:00Z"),  // later this afternoon
+        12 to Instant.parse("2026-10-26T00:20:00Z"),  // Sunday night; team 30 is on a bye
+    )
+
+    @Test
+    fun `your matchup is found from your SWID with you first and full team names`() {
+        val s = EspnParser.snapshot(league, you, kickoffs, now)
+        val mine = s.mine!!
+
+        assertEquals(Side("TOM", 98.36, 112.5, name = "Synthetic Team"), mine.left.copy(starters = emptyList()))
+        assertEquals(Side("ABC", 91.24, 104.04, name = "Alpha Bravo"), mine.right.copy(starters = emptyList()))
+        assertEquals(false, mine.final)
+        assertEquals(8, s.week)
+        assertEquals(now.toEpochMilli(), s.fetchedAt)
+    }
+
+    @Test
+    fun `the rest of the league is listed without repeating your matchup`() {
+        val s = EspnParser.snapshot(league, you, kickoffs, now)
+
+        assertEquals(listOf(Matchup(Side("DEF", 110.0, 110.0, name = "Delta Echo"), Side("GHI", 64.5, 64.5, name = "Golf Hotel"), final = true)), s.others)
+    }
+
+    @Test
+    fun `both sides' starters are in lineup order and marked live, played, to play or on a bye`() {
+        val s = EspnParser.snapshot(league, you, kickoffs, now)
+
+        assertEquals(
+            listOf(
+                PlayerLine("Josh Allen", "QB", 21.42, null, Game.LIVE),
+                PlayerLine("Saquon Barkley", "RB", 12.0, null, Game.LIVE),
+                PlayerLine("Late Kickoff", "WR", 0.0, 14.24, Game.UPCOMING),
+                PlayerLine("Flex Starter", "TE", 6.5, null, Game.LIVE),
+                PlayerLine("Bills D/ST", "D/ST", 4.0, null, Game.LIVE),
+            ),
+            s.mine!!.left.starters,
+        )
+        assertEquals(
+            listOf(
+                PlayerLine("Sunday Night", "QB", 0.0, 18.04, Game.UPCOMING),
+                PlayerLine("Rival Back", "RB", 3.1, null, Game.LIVE),
+                PlayerLine("Thursday Starter", "WR", 17.3, null, Game.PLAYED),
+                PlayerLine("Bye Player", "TE", 0.0, null, Game.BYE),
+            ),
+            s.mine!!.right.starters,
+        )
+    }
+
+    @Test
+    fun `without the NFL schedule every starter keeps their points but no game state`() {
+        val s = EspnParser.snapshot(league, you, kickoffs = null, now = now)
+
+        assertEquals(setOf(Game.UNKNOWN), (s.mine!!.left.starters + s.mine!!.right.starters).map { it.game }.toSet())
+        assertEquals(21.42, s.mine!!.left.starters.first().points, 0.0)
+    }
+
+    @Test
+    fun `a game counts as played four hours after kickoff`() {
+        val later = Instant.parse("2026-10-25T21:01:00Z")
+
+        val allen = EspnParser.snapshot(league, you, kickoffs, later).mine!!.left.starters.first()
+
+        assertEquals(Game.PLAYED, allen.game)
+    }
+
+    @Test
+    fun `kickoffs come from the NFL schedule for the current week`() {
+        val schedule = resource("espn/proschedule.json")
+
+        assertEquals(8, EspnParser.scoringPeriod(league))
+        assertEquals(
+            mapOf(
+                2 to Instant.parse("2026-10-25T17:00:00Z"),
+                21 to Instant.parse("2026-10-25T17:00:00Z"),
+                25 to Instant.parse("2026-10-25T20:25:00Z"),
+            ),
+            EspnParser.kickoffs(schedule, scoringPeriod = 8),
+        )
+    }
+
+    @Test
+    fun `a sparse response still gives a ticker`() {
+        val sparse = """
+            {"status":{"currentMatchupPeriod":3},"teams":[{"id":1,"owners":[]},{"id":2,"abbrev":"XYZ"}],
+             "schedule":[{"matchupPeriodId":3,"home":{"teamId":1,"totalPoints":50.5},"away":{"teamId":2,"totalPointsLive":40}}]}
+        """.trimIndent()
+
+        val s = EspnParser.snapshot(sparse, you, kickoffs = emptyMap(), now = now)
+
+        assertEquals(null, s.mine)
+        assertEquals(listOf(Matchup(Side("?", 50.5, null), Side("XYZ", 40.0, null), final = false)), s.others)
+        assertEquals(3, s.week)
+    }
+
+    @Test
+    fun `entries without team ids are skipped rather than failing the whole fetch`() {
+        val odd = """
+            {"status":{"currentMatchupPeriod":15},"teams":[{"abbrev":"NOID"},{"id":2,"abbrev":"XYZ"},{"id":3,"abbrev":"QRS"}],
+             "schedule":[{"matchupPeriodId":15,"home":{"teamId":2,"totalPointsLive":10}},
+                         {"matchupPeriodId":15,"home":{"totalPointsLive":1},"away":{"teamId":3,"totalPointsLive":2}},
+                         {"matchupPeriodId":15,"home":{"teamId":3,"totalPointsLive":5},"away":{"teamId":2,"totalPointsLive":6}}]}
+        """.trimIndent()
+
+        val s = EspnParser.snapshot(odd, you, kickoffs = emptyMap(), now = now)
+
+        assertEquals(listOf(Matchup(Side("QRS", 5.0, null), Side("XYZ", 6.0, null), final = false)), s.others)
+        assertEquals(null, s.mine)
+    }
+
+    private fun resource(path: String) = javaClass.classLoader!!.getResource(path)!!.readText()
+}

@@ -69,3 +69,15 @@ java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftva
 2026-10-22T20:46:36-04:00 install app.lumen.home 67fdf0430c518143
 2026-10-22T20:48:57-04:00 install app.lumen.home 7fa9a97785bc89db
 2026-10-22T20:53:14-04:00 install app.lumen.home 3d23b361ba5f33f3
+2026-10-24T16:16:25-04:00 install app.lumen.sports 6027dd19eb8a91e1
+2026-10-24T16:16:41-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:24:10-04:00 appop-restored app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:24:17-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:25:21-04:00 appop-restored app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:25:26-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:31:44-04:00 appop-restored app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T16:31:46-04:00 uninstall app.lumen.sports
+2026-10-24T17:02:30-04:00 install app.lumen.sports eb085fff12365dac
+2026-10-24T17:02:31-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
+2026-10-24T17:12:19-04:00 install app.lumen.sports 6331915d06f323a5
+2026-10-24T17:40:12-04:00 auth app.lumen.sports league 2061761840

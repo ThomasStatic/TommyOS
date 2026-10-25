@@ -1,0 +1,63 @@
+{
+  "id": 1,
+  "seasonId": 2026,
+  "scoringPeriodId": 8,
+  "status": { "currentMatchupPeriod": 8, "latestScoringPeriod": 8 },
+  "members": [
+    { "id": "{AAAAAAAA-0000-0000-0000-000000000001}", "displayName": "you" },
+    { "id": "{AAAAAAAA-0000-0000-0000-000000000002}", "displayName": "rival" }
+  ],
+  "teams": [
+    { "id": 1, "abbrev": "ABC", "name": "Alpha Bravo", "owners": ["{AAAAAAAA-0000-0000-0000-000000000002}"] },
+    { "id": 2, "abbrev": "TOM", "name": "Synthetic Team", "owners": ["{AAAAAAAA-0000-0000-0000-000000000001}"] },
+    { "id": 3, "abbrev": "DEF", "name": "Delta Echo", "owners": ["{AAAAAAAA-0000-0000-0000-000000000003}"] },
+    { "id": 4, "abbrev": "GHI", "name": "Golf Hotel", "owners": ["{AAAAAAAA-0000-0000-0000-000000000004}"] }
+  ],
+  "schedule": [
+    {
+      "id": 41, "matchupPeriodId": 8, "winner": "UNDECIDED",
+      "home": {
+        "teamId": 1, "totalPoints": 0.0, "totalPointsLive": 91.24, "totalProjectedPointsLive": 104.04,
+        "rosterForCurrentScoringPeriod": { "entries": [
+          { "playerId": 201, "lineupSlotId": 0, "playerPoolEntry": { "appliedStatTotal": 0.0,
+            "player": { "fullName": "Sunday Night", "proTeamId": 12, "defaultPositionId": 1, "stats": [
+              { "scoringPeriodId": 8, "statSourceId": 1, "statSplitTypeId": 1, "appliedTotal": 18.04 } ] } } },
+          { "playerId": 202, "lineupSlotId": 2, "playerPoolEntry": { "appliedStatTotal": 3.1,
+            "player": { "fullName": "Rival Back", "proTeamId": 21, "defaultPositionId": 2 } } },
+          { "playerId": 203, "lineupSlotId": 4, "playerPoolEntry": { "appliedStatTotal": 17.3,
+            "player": { "fullName": "Thursday Starter", "proTeamId": 9, "defaultPositionId": 3 } } },
+          { "playerId": 204, "lineupSlotId": 21, "playerPoolEntry": { "appliedStatTotal": 0.0,
+            "player": { "fullName": "Hurt Guy", "proTeamId": 21, "defaultPositionId": 3 } } },
+          { "playerId": 205, "lineupSlotId": 6, "playerPoolEntry": { "appliedStatTotal": 0.0,
+            "player": { "fullName": "Bye Player", "proTeamId": 30, "defaultPositionId": 4 } } }
+        ] }
+      },
+      "away": {
+        "teamId": 2, "totalPoints": 0.0, "totalPointsLive": 98.36, "totalProjectedPointsLive": 112.5,
+        "rosterForCurrentScoringPeriod": { "entries": [
+          { "playerId": 101, "lineupSlotId": 0, "playerPoolEntry": { "appliedStatTotal": 21.42,
+            "player": { "fullName": "Josh Allen", "proTeamId": 2, "defaultPositionId": 1 } } },
+          { "playerId": 102, "lineupSlotId": 2, "playerPoolEntry": { "appliedStatTotal": 12.0,
+            "player": { "fullName": "Saquon Barkley", "proTeamId": 21, "defaultPositionId": 2 } } },
+          { "playerId": 106, "lineupSlotId": 23, "playerPoolEntry": { "appliedStatTotal": 6.5,
+            "player": { "fullName": "Flex Starter", "proTeamId": 21, "defaultPositionId": 4 } } },
+          { "playerId": 103, "lineupSlotId": 4, "playerPoolEntry": { "appliedStatTotal": 0.0,
+            "player": { "fullName": "Late Kickoff", "proTeamId": 25, "defaultPositionId": 3, "stats": [
+              { "scoringPeriodId": 7, "statSourceId": 1, "statSplitTypeId": 1, "appliedTotal": 9.9 },
+              { "scoringPeriodId": 8, "statSourceId": 0, "statSplitTypeId": 1, "appliedTotal": 0.0 },
+              { "scoringPeriodId": 8, "statSourceId": 1, "statSplitTypeId": 0, "appliedTotal": 140.0 },
+              { "scoringPeriodId": 8, "statSourceId": 1, "statSplitTypeId": 1, "appliedTotal": 14.24 } ] } } },
+          { "playerId": 104, "lineupSlotId": 20, "playerPoolEntry": { "appliedStatTotal": 9.5,
+            "player": { "fullName": "Bench Warmer", "proTeamId": 2, "defaultPositionId": 3 } } },
+          { "playerId": 105, "lineupSlotId": 16, "playerPoolEntry": { "appliedStatTotal": 4.0,
+            "player": { "fullName": "Bills D/ST", "proTeamId": 2, "defaultPositionId": 16 } } }
+        ] }
+      }
+    },
+    {
+      "id": 42, "matchupPeriodId": 8, "winner": "HOME",
+      "home": { "teamId": 3, "totalPoints": 110.0, "totalPointsLive": 110.0, "totalProjectedPointsLive": 110.0 },
+      "away": { "teamId": 4, "totalPoints": 64.5, "totalPointsLive": 64.5, "totalProjectedPointsLive": 64.5 }
+    }
+  ]
+}

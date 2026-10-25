@@ -11,6 +11,7 @@ Findings, package classification and decisions: [PLAN.md](PLAN.md).
 | 23 Amazon packages | `pm disable-user --user 0` (never uninstalled) | `scripts/restore.sh` |
 | Lumen app (`app.lumen.home`) | Installed; no permissions | `scripts/restore.sh` (uninstalls) |
 | Home button | Secure settings `enabled_accessibility_services` (orig `null`) and `accessibility_enabled` (orig `0`) | `scripts/restore.sh` |
+| Lumen Sports (`app.lumen.sports`) | ESPN fantasy ticker overlay; installed with app-op `SYSTEM_ALERT_WINDOW` = `allow` (orig `default`); ESPN cookies, once `auth` runs, stored encrypted on the TV (uninstall deletes them). Off unless shown; off after reboot. See [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
 
 Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinking`. Re-enabled by Fire OS at boot (left on): `com.amazon.vizzini`.
 
@@ -36,18 +37,22 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 | `scripts/launcher.sh install\|open\|enable-redirect\|disable-redirect\|uninstall\|status` | Lumen management, logged | Yes |
 | `scripts/restore.sh [--dry-run]` | **Full rollback** | Yes |
 | `launcher/build.sh` | Build signed Lumen APK | No (PC only) |
+| `scripts/sports.sh install\|grant\|revoke\|auth\|sign-out\|show [opacity]\|opacity <0-1>\|hide\|refresh\|status\|diag\|shot <label>\|uninstall` | Lumen Sports management, logged. `auth` sends the cookies in `sports/espn-auth.properties` (git-ignored) to the TV | Yes |
+| `scripts/sports.sh espn-dump [dir]` | Raw ESPN responses for parser fixtures, saved outside the repo | No (PC only) |
+| `sports/build.sh`, `sports/test.sh [TestClass]` | Build the Sports APK (Lumen's signing key); run its JVM unit tests | No (PC only) |
 
 ## Complete rollback procedure
 
 1. On the TV, make sure **Settings → My Fire TV → Developer Options → ADB Debugging** is on (it survives reboots on this TV).
 2. On the PC: `bash scripts/restore.sh --dry-run` and review the list.
-3. `bash scripts/restore.sh` — restores both accessibility settings to their original values, uninstalls Lumen, re-enables every package this project disabled (newest first), and verifies each.
+3. `bash scripts/restore.sh` — restores both accessibility settings to their original values, restores Lumen Sports' overlay app-op and uninstalls it (its stored ESPN cookies go with it), uninstalls Lumen, re-enables every package this project disabled (newest first), and verifies each.
 4. Reboot the TV (`adb -s 10.0.0.213:5555 reboot`), then `bash scripts/verify.sh` — every package should report `expected=enabled ok`.
 5. Optional, in the TV's Settings UI: re-enable the privacy options you turned off, and turn off ADB Debugging / Developer Options.
 
 **If ADB is unavailable** (e.g. Developer Options reset by an update):
 - Home button: in the Lumen tile → "Show Lumen when Home is pressed" → Off (always available). Fire TV's Settings → Accessibility may also list "Lumen Home button" (not verified on this build).
 - Lumen: Settings → Applications → Manage Installed Applications → Lumen → Uninstall.
+- Lumen Sports ticker: Settings → Applications → Manage Installed Applications → Lumen Sports → Force stop (hides it until next shown) or Uninstall (also deletes its ESPN cookies).
 - Disabled packages: Settings → Applications → Manage Installed Applications → *app* → Enable (shown for most; otherwise re-enable ADB and run restore).
 - Last resort (erases everything, **only with your decision**): factory reset restores all Amazon packages and settings.
 
