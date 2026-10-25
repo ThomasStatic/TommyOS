@@ -147,7 +147,8 @@ class TickerService : Service() {
             cache.save(result)
             failures = 0
             publish(result, null)
-            Log.i(TAG, "fetched week ${result.week}: ${result.others.size + (if (result.mine != null) 1 else 0)} matchups, ${result.livePlayers.size} live players")
+            val live = result.mine?.let { m -> (m.left.starters + m.right.starters).count { it.game == Game.LIVE } } ?: 0
+            Log.i(TAG, "fetched week ${result.week}: ${result.others.size + (if (result.mine != null) 1 else 0)} matchups, $live live players")
         } catch (e: EspnClient.AuthException) {
             Log.w(TAG, "fetch: ${e.message}")
             publish(null, "ESPN sign-in expired   run scripts/sports.sh auth on the PC")

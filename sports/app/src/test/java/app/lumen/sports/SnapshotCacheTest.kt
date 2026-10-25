@@ -12,9 +12,15 @@ class SnapshotCacheTest {
     private val snapshot = Snapshot(
         fetchedAt = 1_793_000_000_000L,
         week = 8,
-        mine = Matchup(Side("TOM", 98.36, 112.5), Side("ABC", 91.24, null), final = false),
-        others = listOf(Matchup(Side("DEF", 87.1, 101.2), Side("GHÏ", 90.3, 95.0), final = true)),
-        livePlayers = listOf(PlayerLine("Ja'Marr Chase", "WR", 8.26)),
+        mine = Matchup(
+            Side("TOM", 98.36, 112.5, name = "Synthetic Team", starters = listOf(
+                PlayerLine("Ja'Marr Chase", "WR", 8.26, null, Game.LIVE),
+                PlayerLine("Late Kickoff", "WR", 0.0, 14.24, Game.UPCOMING),
+            )),
+            Side("ABC", 91.24, null, name = "Ålpha 🏈", starters = listOf(PlayerLine("Thursday Starter", "WR", 17.3, 11.0, Game.PLAYED))),
+            final = false,
+        ),
+        others = listOf(Matchup(Side("DEF", 87.1, 101.2, name = "Delta Echo"), Side("GHÏ", 90.3, 95.0), final = true)),
     )
 
     @Test
@@ -24,8 +30,8 @@ class SnapshotCacheTest {
         cache.save(snapshot)
         assertEquals(snapshot, SnapshotCache(File(tmp.root, "snapshot.json")).load())
 
-        cache.save(snapshot.copy(mine = null, livePlayers = emptyList()))
-        assertEquals(snapshot.copy(mine = null, livePlayers = emptyList()), cache.load())
+        cache.save(snapshot.copy(mine = null))
+        assertEquals(snapshot.copy(mine = null), cache.load())
     }
 
     @Test

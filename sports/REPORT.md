@@ -100,7 +100,15 @@ Implemented in `sports/` (see the code's KDoc); unit-tested at four seams (`Espn
 - The Lumen toggle. It needs a signature permission on the service, which is DUMP-guarded for now.
 - Edge choice and auto mode.
 
-**Known limitation:** a player stays "live" until 4 h after kickoff. Each NFL game has a `statsOfficial` flag (true for Thursday's finished game, false for Sunday's), which could end that early. Its lag after the final whistle is unknown, and using it would mean re-reading the schedule during games, so it's not used yet.
+**Matchup detail (2026-10-25).** The ticker now pages through, in order:
+1. Your matchup, with both full team names (`teams[].name`) and projections.
+2. Both teams' starters, grouped as live, played, then still to play (yours before your opponent's). Each group starts a new page, and long groups split 3 players at a time.
+   - Players still to play show ESPN's weekly projection: the `stats` entry with `statSourceId` 1, `statSplitTypeId` 1 and the current scoring period.
+3. The rest of the league, abbreviated, starting a new page.
+
+Checked on the TV during the 1 pm games: 7 pages, about 42 s per cycle, nothing cut off.
+
+**Known limitation:** a player stays "live" until 4 h after kickoff, then moves to "played". Each NFL game has a `statsOfficial` flag (true for Thursday's finished game, false for Sunday's), which could end that early. Its lag after the final whistle is unknown, and using it would mean re-reading the schedule during games, so it's not used yet.
 
 The original proposal follows.
 

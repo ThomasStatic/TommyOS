@@ -12,7 +12,8 @@ import android.util.Log
 import android.view.View
 
 /**
- * The ticker bar: a label chip, then pages of [TickerItem]s. Each page holds as many items as fit,
+ * The ticker bar: a label chip, then pages of [TickerItem]s. Each page holds as many items as fit
+ * (an item marked [TickerItem.newPage] always starts one),
  * stays still for [PAGE_MS] and crossfades to the next in [FADE_MS]. Between fades nothing is
  * redrawn: continuous scrolling cost ~23 % of a core plus compositor load on this TV (see REPORT.md).
  * Knows nothing about ESPN; it just shows whatever items it is given.
@@ -90,7 +91,7 @@ class TickerView(context: Context) : View(context) {
         for (item in items) {
             val w = paint(item).measureText(item.text)
             val needed = if (current.isEmpty()) w else used + gap + w
-            if (current.isNotEmpty() && needed > available) {
+            if (current.isNotEmpty() && (item.newPage || needed > available)) {
                 out += current
                 current = ArrayList()
                 used = w

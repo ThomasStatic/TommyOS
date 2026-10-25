@@ -14,37 +14,65 @@ class EspnParserTest {
     private val you = "{AAAAAAAA-0000-0000-0000-000000000001}"
     private val now = Instant.parse("2026-10-25T18:30:00Z")
 
-    @Test
-    fun `your matchup is found from your SWID with you first`() {
-        val s = EspnParser.snapshot(league, you, kickoffs = emptyMap(), now = now)
+    private val kickoffs = mapOf(
+        2 to Instant.parse("2026-10-25T17:00:00Z"),   // under way: Allen, the bench player, Bills D/ST
+        21 to Instant.parse("2026-10-25T17:00:00Z"),  // under way: Barkley, the flex, Rival Back, the IR player
+        9 to Instant.parse("2026-10-23T00:15:00Z"),   // Thursday night, long over
+        25 to Instant.parse("2026-10-25T20:25:00Z"),  // later this afternoon
+        12 to Instant.parse("2026-10-26T00:20:00Z"),  // Sunday night; team 30 is on a bye
+    )
 
-        assertEquals(Matchup(Side("TOM", 98.36, 112.5), Side("ABC", 91.24, 104.04), final = false), s.mine)
+    @Test
+    fun `your matchup is found from your SWID with you first and full team names`() {
+        val s = EspnParser.snapshot(league, you, kickoffs, now)
+        val mine = s.mine!!
+
+        assertEquals(Side("TOM", 98.36, 112.5, name = "Synthetic Team"), mine.left.copy(starters = emptyList()))
+        assertEquals(Side("ABC", 91.24, 104.04, name = "Alpha Bravo"), mine.right.copy(starters = emptyList()))
+        assertEquals(false, mine.final)
         assertEquals(8, s.week)
         assertEquals(now.toEpochMilli(), s.fetchedAt)
     }
 
     @Test
     fun `the rest of the league is listed without repeating your matchup`() {
-        val s = EspnParser.snapshot(league, you, kickoffs = emptyMap(), now = now)
+        val s = EspnParser.snapshot(league, you, kickoffs, now)
 
-        assertEquals(listOf(Matchup(Side("DEF", 110.0, 110.0), Side("GHI", 64.5, 64.5), final = true)), s.others)
+        assertEquals(listOf(Matchup(Side("DEF", 110.0, 110.0, name = "Delta Echo"), Side("GHI", 64.5, 64.5, name = "Golf Hotel"), final = true)), s.others)
     }
 
     @Test
-    fun `live players are your starters whose NFL game is under way`() {
-        val kickoffs = mapOf(
-            2 to Instant.parse("2026-10-25T17:00:00Z"),   // under way: Allen, the bench player, Bills D/ST
-            21 to Instant.parse("2026-10-25T17:00:00Z"),  // under way: Barkley
-            25 to Instant.parse("2026-10-25T20:25:00Z"),  // not started yet
-        )
-
+    fun `both sides' starters are in lineup order and marked live, played or still to play`() {
         val s = EspnParser.snapshot(league, you, kickoffs, now)
 
         assertEquals(
-            listOf(PlayerLine("Josh Allen", "QB", 21.42), PlayerLine("Saquon Barkley", "RB", 12.0), PlayerLine("Flex Starter", "TE", 6.5), PlayerLine("Bills D/ST", "D/ST", 4.0)),
-            s.livePlayers,
+            listOf(
+                PlayerLine("Josh Allen", "QB", 21.42, null, Game.LIVE),
+                PlayerLine("Saquon Barkley", "RB", 12.0, null, Game.LIVE),
+                PlayerLine("Late Kickoff", "WR", 0.0, 14.24, Game.UPCOMING),
+                PlayerLine("Flex Starter", "TE", 6.5, null, Game.LIVE),
+                PlayerLine("Bills D/ST", "D/ST", 4.0, null, Game.LIVE),
+            ),
+            s.mine!!.left.starters,
         )
-        assertEquals(emptyList<PlayerLine>(), EspnParser.snapshot(league, you, kickoffs, Instant.parse("2026-10-25T21:01:00Z").plusSeconds(3600)).livePlayers.filter { it.name == "Josh Allen" })
+        assertEquals(
+            listOf(
+                PlayerLine("Sunday Night", "QB", 0.0, 18.04, Game.UPCOMING),
+                PlayerLine("Rival Back", "RB", 3.1, null, Game.LIVE),
+                PlayerLine("Thursday Starter", "WR", 17.3, null, Game.PLAYED),
+                PlayerLine("Bye Player", "TE", 0.0, null, Game.UPCOMING),
+            ),
+            s.mine!!.right.starters,
+        )
+    }
+
+    @Test
+    fun `a game counts as played four hours after kickoff`() {
+        val later = Instant.parse("2026-10-25T21:01:00Z")
+
+        val allen = EspnParser.snapshot(league, you, kickoffs, later).mine!!.left.starters.first()
+
+        assertEquals(Game.PLAYED, allen.game)
     }
 
     @Test
@@ -88,6 +116,7 @@ class EspnParserTest {
         val s = EspnParser.snapshot(odd, you, kickoffs = emptyMap(), now = now)
 
         assertEquals(listOf(Matchup(Side("QRS", 5.0, null), Side("XYZ", 6.0, null), final = false)), s.others)
+        assertEquals(null, s.mine)
     }
 
     private fun resource(path: String) = javaClass.classLoader!!.getResource(path)!!.readText()
