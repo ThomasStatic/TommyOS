@@ -11,6 +11,7 @@ import java.time.Instant
  */
 class EspnParserTest {
     private val league = resource("espn/league.json")
+    private val scoreboard = EspnParser.gameStates(resource("espn/scoreboard.json"))
     private val you = "{AAAAAAAA-0000-0000-0000-000000000001}"
     private val now = Instant.parse("2026-10-25T18:30:00Z")
 
@@ -75,12 +76,36 @@ class EspnParserTest {
     }
 
     @Test
-    fun `a game counts as played four hours after kickoff`() {
+    fun `without live game status a game counts as played four hours after kickoff`() {
         val later = Instant.parse("2026-10-25T21:01:00Z")
 
         val allen = EspnParser.snapshot(league, you, kickoffs, later).mine!!.left.starters.first()
 
         assertEquals(Game.PLAYED, allen.game)
+    }
+
+    @Test
+    fun `game status comes from the NFL scoreboard by team`() {
+        assertEquals(mapOf(2 to Game.PLAYED, 15 to Game.PLAYED, 21 to Game.LIVE, 6 to Game.LIVE, 25 to Game.UPCOMING, 1 to Game.UPCOMING), scoreboard)
+    }
+
+    @Test
+    fun `a player whose game is over is played as soon as the scoreboard says so`() {
+        val s = EspnParser.snapshot(league, you, kickoffs, now, scoreboard)
+
+        assertEquals(
+            listOf("Josh Allen" to Game.PLAYED, "Saquon Barkley" to Game.LIVE, "Late Kickoff" to Game.UPCOMING, "Flex Starter" to Game.LIVE, "Bills D/ST" to Game.PLAYED),
+            s.mine!!.left.starters.map { it.name to it.game },
+        )
+    }
+
+    @Test
+    fun `a game still going four hours after kickoff stays live`() {
+        val overtime = Instant.parse("2026-10-25T21:05:00Z")
+
+        val barkley = EspnParser.snapshot(league, you, kickoffs, overtime, scoreboard).mine!!.left.starters[1]
+
+        assertEquals(Game.LIVE, barkley.game)
     }
 
     @Test

@@ -15,7 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * ESPN league ID and login cookies (espn_s2, SWID), encrypted with an AES-GCM key that lives in
  * the Android Keystore and can't be exported. Stored in no-backup storage; never logged.
- * Written only by [AuthReceiver] (reachable from `adb shell` alone).
+ * Written only by [AuthProvider] (reachable from `adb shell` alone).
  */
 class Credentials(context: Context) {
     data class Value(val leagueId: String, val espnS2: String, val swid: String)

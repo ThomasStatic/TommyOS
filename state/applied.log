@@ -81,3 +81,24 @@ java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftva
 2026-10-24T17:02:31-04:00 appop app.lumen.sports SYSTEM_ALERT_WINDOW default
 2026-10-24T17:12:19-04:00 install app.lumen.sports 6331915d06f323a5
 2026-10-24T17:40:12-04:00 auth app.lumen.sports league 2061761840
+2026-10-25T13:28:54-04:00 install app.lumen.sports 662d025285c16f01
+2026-10-25T13:47:47-04:00 install app.lumen.sports 102ec52b80289d0e
+2026-10-25T16:56:22-04:00 install app.lumen.sports ac3e371c1e1b0fb7
+2026-10-25T17:41:18-04:00 install app.lumen.sports 5bcd66c299d97d0d
+2026-10-25T17:44:57-04:00 install app.lumen.sports ab0ef7e668629362
+2026-10-25T17:47:16-04:00 install app.lumen.sports 4a8187c4ae60176e
+2026-10-25T17:49:37-04:00 install app.lumen.sports 4c8406456c1600d8
+2026-10-25T18:41:51-04:00 install app.lumen.sports 3cd6afa0778c81c0
+2026-10-25T18:46:49-04:00 auth app.lumen.sports league 2061761840 (test: invalid credentials)
+2026-10-25T18:51:14-04:00 install app.lumen.sports 195ed80e99edbc3d
+2026-10-25T18:51:22-04:00 auth app.lumen.sports league 2061761840 (test: invalid credentials via provider)
+2026-10-25T18:52:43-04:00 auth app.lumen.sports league 2061761840
+2026-10-25T18:59:22-04:00 install app.lumen.sports 195ed80e99edbc3d
+2026-10-25T19:02:56-04:00 install app.lumen.sports 6b0cb9429885c1f5
+2026-10-25T19:16:44-04:00 wifi-test TV wifi disable 250 s then enable (scheduled on the TV)
+2026-10-25T19:25:21-04:00 wifi-restored TV wifi enabled by the scheduled test
+2026-10-25T19:25:42-04:00 install app.lumen.sports f2be6d5feaa8fd89
+2026-10-25T19:25:48-04:00 wifi-test TV wifi disable 250 s then enable (scheduled on the TV, retest)
+2026-10-25T19:34:20-04:00 wifi-restored TV wifi enabled by the scheduled retest
+2026-10-25T19:34:31-04:00 reboot TV (restart test)
+2026-10-25T19:39:14-04:00 install app.lumen.sports b4cfb35d22f088c8

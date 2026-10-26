@@ -7,8 +7,9 @@ import java.time.ZonedDateTime
 
 /**
  * One poll's worth of ESPN work for one set of credentials: the league filtered to the current
- * week, plus NFL kickoff times from the season schedule (re-read twice a day), parsed into a
- * [Snapshot]. Remembers the week between polls, so a normal poll is a single request.
+ * week, plus NFL kickoff times from the season schedule (re-read twice a day) and, while a game is
+ * under way, the NFL scoreboard for which games are live or over, parsed into a [Snapshot].
+ * Remembers the week between polls, so a poll outside game time is a single request.
  * Worker thread only; blocking.
  */
 class LeagueFetcher(val creds: Credentials.Value, startWeek: Int?) {
@@ -31,7 +32,25 @@ class LeagueFetcher(val creds: Credentials.Value, startWeek: Int?) {
         }
         val teamKickoffs = schedule.kickoffs(season, EspnParser.scoringPeriod(league), now)
         kickoffs = teamKickoffs?.values?.distinct()
-        return EspnParser.snapshot(league, creds.swid, teamKickoffs, now)
+        return EspnParser.snapshot(league, creds.swid, teamKickoffs, now, gameStates(now))
+    }
+
+    /**
+     * Live status of the games under way (kicked off within [PollPolicy.GAME_MS]), so finished games
+     * move to played at the final whistle. Empty when none are, or when the scoreboard fails: the
+     * parser then goes by the clock.
+     */
+    private fun gameStates(now: Instant): Map<Int, Game> {
+        val t = now.toEpochMilli()
+        val underWay = kickoffs.orEmpty().filter { t >= it.toEpochMilli() && t <= it.toEpochMilli() + PollPolicy.GAME_MS }
+        if (underWay.isEmpty()) return emptyMap()
+        val days = underWay.map { it.atZone(ZONE).toLocalDate() }
+        return try {
+            EspnParser.gameStates(client.nflScoreboard(days.min(), days.max()))
+        } catch (e: Exception) {
+            Log.w(TAG, "NFL scoreboard unavailable: $e")
+            emptyMap()
+        }
     }
 
     /** The NFL season schedule, fetched at most every [MAX_AGE_MS] (or [RETRY_MS] after a failure). */

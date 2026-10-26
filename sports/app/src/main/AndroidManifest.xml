@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- ESPN's fantasy API only (lm-api-reads.fantasy.espn.com). Lumen itself stays offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- To retry as soon as the network returns after failed fetches (a normal, install-time permission). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -25,9 +27,11 @@
             android:exported="true"
             android:permission="android.permission.DUMP" />
 
-        <!-- Credentials arrive only from `adb shell`: DUMP is held by the shell, not by apps. -->
-        <receiver
-            android:name=".AuthReceiver"
+        <!-- Credentials arrive only from `adb shell`: DUMP is held by the shell, not by apps. A provider
+             call, not a broadcast: the system's broadcast history would keep the cookie in plain text. -->
+        <provider
+            android:name=".AuthProvider"
+            android:authorities="app.lumen.sports.auth"
             android:exported="true"
             android:permission="android.permission.DUMP" />
     </application>

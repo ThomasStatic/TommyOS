@@ -12,9 +12,10 @@ object EspnParser {
     /**
      * [swid]: your ESPN member id, which identifies your team. [kickoffs]: NFL team id -> kickoff
      * this week (see [kickoffs]), used to tell whose game is under way, over, still to come or a
-     * bye; null when the schedule couldn't be read.
+     * bye; null when the schedule couldn't be read. [gameStates]: NFL team id -> live status from
+     * the scoreboard (see [gameStates]); teams missing from it are judged by the clock.
      */
-    fun snapshot(leagueJson: String, swid: String, kickoffs: Map<Int, Instant>?, now: Instant): Snapshot {
+    fun snapshot(leagueJson: String, swid: String, kickoffs: Map<Int, Instant>?, now: Instant, gameStates: Map<Int, Game> = emptyMap()): Snapshot {
         val league = JSONObject(leagueJson)
         val teams = league.getJSONArray("teams").objects().filter { it.has("id") }
         val abbrev = teams.associate { it.getInt("id") to it.optString("abbrev", "?") }
@@ -33,7 +34,7 @@ object EspnParser {
                 points = o.optDouble("totalPointsLive", o.optDouble("totalPoints", 0.0)),
                 projected = o.optDouble("totalProjectedPointsLive").takeIf { !it.isNaN() },
                 name = names[id] ?: short,
-                starters = if (withStarters) starters(o, scoringPeriod, kickoffs, now) else emptyList(),
+                starters = if (withStarters) starters(o, scoringPeriod, kickoffs, gameStates, now) else emptyList(),
             )
         }
 
@@ -76,15 +77,35 @@ object EspnParser {
         return out
     }
 
+    /** NFL team id -> where its game is, from the public NFL scoreboard (pre / in / post). */
+    fun gameStates(scoreboardJson: String): Map<Int, Game> {
+        val out = HashMap<Int, Game>()
+        for (event in JSONObject(scoreboardJson).optJSONArray("events")?.objects().orEmpty()) {
+            val game = event.optJSONArray("competitions")?.optJSONObject(0) ?: continue
+            val state = when (game.optJSONObject("status")?.optJSONObject("type")?.optString("state")) {
+                "pre" -> Game.UPCOMING
+                "in" -> Game.LIVE
+                "post" -> Game.PLAYED
+                else -> continue
+            }
+            for (team in game.optJSONArray("competitors")?.objects().orEmpty()) {
+                team.optJSONObject("team")?.optString("id")?.toIntOrNull()?.let { out[it] = state }
+            }
+        }
+        return out
+    }
+
     private fun matchupPeriod(league: JSONObject): Int? =
         league.optJSONObject("status")?.optInt("currentMatchupPeriod", 0)?.takeIf { it > 0 }
 
     /**
-     * Starters (not bench or IR) in lineup order. A game is live from kickoff for
-     * [PollPolicy.GAME_MS], then played; ESPN's per-game "final" flag only arrives with the
-     * twice-daily schedule, too late to use. A team missing from a known schedule is on a bye.
+     * Starters (not bench or IR) in lineup order. A game's state comes from [gameStates] when the
+     * scoreboard has it; otherwise it is live from kickoff for [PollPolicy.GAME_MS], then played.
+     * A team missing from a known schedule is on a bye.
      */
-    private fun starters(side: JSONObject, scoringPeriod: Int, kickoffs: Map<Int, Instant>?, now: Instant): List<PlayerLine> {
+    private fun starters(
+        side: JSONObject, scoringPeriod: Int, kickoffs: Map<Int, Instant>?, gameStates: Map<Int, Game>, now: Instant,
+    ): List<PlayerLine> {
         val entries = side.optJSONObject("rosterForCurrentScoringPeriod")?.optJSONArray("entries") ?: return emptyList()
         val t = now.toEpochMilli()
         return entries.objects()
@@ -93,10 +114,12 @@ object EspnParser {
             .mapNotNull { e ->
                 val pool = e.optJSONObject("playerPoolEntry") ?: return@mapNotNull null
                 val player = pool.optJSONObject("player") ?: return@mapNotNull null
-                val kickoff = kickoffs?.get(player.optInt("proTeamId"))?.toEpochMilli()
+                val team = player.optInt("proTeamId")
+                val kickoff = kickoffs?.get(team)?.toEpochMilli()
                 val game = when {
                     kickoffs == null -> Game.UNKNOWN
                     kickoff == null -> Game.BYE
+                    team in gameStates -> gameStates.getValue(team)
                     t < kickoff -> Game.UPCOMING
                     t > kickoff + PollPolicy.GAME_MS -> Game.PLAYED
                     else -> Game.LIVE

@@ -24,7 +24,7 @@ class SnapshotCache(private val file: File) {
         null
     }
 
-    private fun toJson(s: Snapshot) = JSONObject()
+    internal fun toJson(s: Snapshot) = JSONObject()
         .put("fetchedAt", s.fetchedAt)
         .put("week", s.week)
         .put("mine", s.mine?.let(::matchupJson) ?: JSONObject.NULL)
@@ -39,7 +39,7 @@ class SnapshotCache(private val file: File) {
     private fun playerJson(p: PlayerLine) = JSONObject()
         .put("name", p.name).put("pos", p.position).put("pts", p.points).put("proj", p.projected ?: JSONObject.NULL).put("game", p.game.name)
 
-    private fun fromJson(o: JSONObject) = Snapshot(
+    internal fun fromJson(o: JSONObject) = Snapshot(
         fetchedAt = o.getLong("fetchedAt"),
         week = o.getInt("week"),
         mine = o.optJSONObject("mine")?.let(::matchup),

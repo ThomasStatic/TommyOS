@@ -1,0 +1,13 @@
+{
+  "week": {"number": 8},
+  "events": [
+    {"date": "2026-10-25T17:00Z", "competitions": [{"status": {"type": {"name": "STATUS_FINAL", "state": "post", "completed": true}},
+      "competitors": [{"id": "2", "team": {"id": "2", "abbreviation": "BUF"}}, {"id": "15", "team": {"id": "15", "abbreviation": "MIA"}}]}]},
+    {"date": "2026-10-25T17:00Z", "competitions": [{"status": {"type": {"name": "STATUS_IN_PROGRESS", "state": "in", "completed": false}},
+      "competitors": [{"id": "21", "team": {"id": "21", "abbreviation": "PHI"}}, {"id": "6", "team": {"id": "6", "abbreviation": "DAL"}}]}]},
+    {"date": "2026-10-25T20:25Z", "competitions": [{"status": {"type": {"name": "STATUS_SCHEDULED", "state": "pre", "completed": false}},
+      "competitors": [{"id": "25", "team": {"id": "25", "abbreviation": "SF"}}, {"id": "1", "team": {"id": "1", "abbreviation": "ATL"}}]}]},
+    {"date": "2026-10-25T17:00Z", "competitions": [{"status": {"type": {"name": "STATUS_FINAL", "state": "post", "completed": true}},
+      "competitors": [{"team": {"abbreviation": "NOID"}}]}]}
+  ]
+}
