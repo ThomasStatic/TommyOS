@@ -80,8 +80,8 @@ case "${1:-}" in
     done
     kill "$logpid" 2>/dev/null
     connected && echo "$(date -Iseconds) end $(net_bytes)" >> "$dir/net.txt"
-    python "$ROOT/scripts/soak_summary.py" "$dir" ;;
+    python "$(cygpath -w "$ROOT/scripts/soak_summary.py")" "$(cygpath -w "$dir")" ;;
   summary)
-    python "$ROOT/scripts/soak_summary.py" "${2:?dir}" ;;
+    python "$(cygpath -w "$ROOT/scripts/soak_summary.py")" "$(cygpath -w "${2:?dir}")" ;;
   *) echo "usage: scripts/soak.sh run [minutes] [interval_s] [label] | summary <dir>"; exit 2 ;;
 esac

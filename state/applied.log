@@ -105,3 +105,21 @@ java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftva
 2026-10-25T23:43:42-04:00 install app.lumen.sports 7812a8f9b0fda023
 2026-10-25T23:43:45-04:00 install app.lumen.home 680db9b57eb40b57
 2026-10-25T23:44:02-04:00 phone app.lumen.sports on
+2026-10-26T02:04:58-04:00 install app.lumen.home bc49c3582ac5ad8b
+2026-10-26T02:05:23-04:00 install app.lumen.sports ad3332389864154e
+2026-10-26T02:16:30-04:00 install app.lumen.home f53fcaed6bf8044b
+2026-10-26T02:21:44-04:00 install app.lumen.home 7e2fcca938b081bf
+2026-10-26T02:28:17-04:00 wifi-test TV wifi disable 120 s then enable (scheduled on the TV, chaos.sh)
+2026-10-26T02:30:43-04:00 wifi-restored TV wifi enabled by the scheduled chaos.sh test
+2026-10-26T02:31:07-04:00 reboot TV (chaos.sh)
+2026-10-26T02:33:45-04:00 wifi-test TV wifi disable 60 s then enable (scheduled on the TV, chaos.sh)
+2026-10-26T02:35:10-04:00 wifi-restored TV wifi enabled by the scheduled chaos.sh test
+2026-10-26T02:39:15-04:00 wifi-test TV wifi disable 60 s then enable (scheduled on the TV, chaos.sh)
+2026-10-26T02:40:40-04:00 wifi-restored TV wifi enabled by the scheduled chaos.sh test
+2026-10-26T02:42:04-04:00 install app.lumen.sports ad3332389864154e
+2026-10-26T02:43:25-04:00 install app.lumen.sports 52c92f2a7ec43d75
+2026-10-26T02:43:37-04:00 wifi-test TV wifi disable 120 s then enable (scheduled on the TV, chaos.sh)
+2026-10-26T02:46:02-04:00 wifi-restored TV wifi enabled by the scheduled chaos.sh test
+2026-10-26T02:46:18-04:00 wifi-test TV wifi disable 120 s then enable (scheduled on the TV, chaos.sh)
+2026-10-26T02:48:43-04:00 wifi-restored TV wifi enabled by the scheduled chaos.sh test
+2026-10-26T02:56:49-04:00 install app.lumen.sports 1809f4095b4ea825

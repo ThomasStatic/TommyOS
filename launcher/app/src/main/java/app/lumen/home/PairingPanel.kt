@@ -26,8 +26,12 @@ class PairingPanel(private val root: FrameLayout, private val cinema: Boolean, p
 
     val isShowing get() = shown != null
 
-    /** [qr]: rows of '1' (dark) and '0' from Lumen Sports; [address]: the page's address, for reading out. */
-    fun show(qr: String, address: String, renewed: Boolean) {
+    /**
+     * [qr]: rows of '1' (dark) and '0' from Lumen Sports; [address]: the page's address, for reading out.
+     * [tickerEdge]: Gravity.TOP or BOTTOM while the ticker is on screen there (it draws over everything),
+     * so the card sits at the other edge; 0 centres it.
+     */
+    fun show(qr: String, address: String, renewed: Boolean, tickerEdge: Int = 0) {
         dismiss()
         val backdrop = FrameLayout(context).apply {
             setBackgroundColor(Ink.BACKDROP)
@@ -38,10 +42,10 @@ class PairingPanel(private val root: FrameLayout, private val cinema: Boolean, p
             gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = dp(if (cinema) 28 else 16).toFloat()
-                setColor(Ink.DIALOG)
+                setColor(Ink.DIALOG or 0xFF000000.toInt()) // opaque: rows behind would show through the code
                 setStroke(dp(1), Ink.DIALOG_STROKE)
             }
-            setPadding(dp(Space.XXXL), dp(Space.XXXL), dp(Space.XXXL), dp(Space.XXXL))
+            setPadding(dp(Space.XXL), dp(Space.XXL), dp(Space.XXL), dp(Space.XXL))
         }
         card.addView(QrView(context, qr), LinearLayout.LayoutParams(dp(QR_DP), dp(QR_DP)))
 
@@ -51,7 +55,7 @@ class PairingPanel(private val root: FrameLayout, private val cinema: Boolean, p
         for ((i, step) in STEPS.withIndex()) {
             side.addView(text("${i + 1}.  $step", Type.BODY, Ink.TEXT_SECONDARY).apply { setPadding(0, dp(if (i == 0) Space.XL else Space.M), 0, 0) })
         }
-        side.addView(text("The page lives on this TV at $address. It can show, hide and move the ticker; nothing about your league leaves the TV.",
+        side.addView(text("The page lives on this TV at $address. Nothing about your league leaves the TV.",
             Type.CAPTION, Ink.TEXT_TERTIARY).apply { setPadding(0, dp(Space.XL), 0, 0) })
         val done = MenuRow(context, cinema).set("Done", emphasis = true).apply {
             setOnClickListener { dismiss() }
@@ -61,9 +65,15 @@ class PairingPanel(private val root: FrameLayout, private val cinema: Boolean, p
             }
         }
         side.addView(done, LinearLayout.LayoutParams(dp(220), ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(Space.XL) })
-        card.addView(side, LinearLayout.LayoutParams(dp(520), ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(Space.XXXL) })
+        card.addView(side, LinearLayout.LayoutParams(dp(SIDE_DP), ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(Space.XXL) })
 
-        backdrop.addView(card, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        val place = when (tickerEdge) {
+            Gravity.BOTTOM -> Gravity.TOP
+            Gravity.TOP -> Gravity.BOTTOM
+            else -> Gravity.CENTER_VERTICAL
+        }
+        backdrop.addView(card, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL or place)
+            .apply { topMargin = dp(Space.XL); bottomMargin = dp(Space.XL) })
         root.addView(backdrop, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         shown = backdrop
         done.requestFocus()
@@ -109,12 +119,15 @@ class PairingPanel(private val root: FrameLayout, private val cinema: Boolean, p
     }
 
     private companion object {
-        const val QR_DP = 300
+        // 32 + 260 + 32 + 460 + 32 = 816 dp wide on a 960 dp screen; about 420 dp tall, which clears
+        // a bottom (or top) ticker when placed at the other edge of the 540 dp screen.
+        const val QR_DP = 260
+        const val SIDE_DP = 460
         const val QUIET = 4
         val STEPS = listOf(
-            "Open the Camera on your iPhone and point it at the code.",
+            "Point your iPhone's Camera at the code.",
             "Tap the link that appears.",
-            "In Safari, tap Share, then Add to Home Screen.",
+            "In Safari: Share, then Add to Home Screen.",
         )
         val TRAPPED = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
     }

@@ -53,8 +53,9 @@ switch_() {
 
 sleep_() {
   local s="${1:-60}" t0 frames
-  sh_ dumpsys gfxinfo "$PKG" reset > /dev/null
   sh_ input keyevent KEYCODE_SLEEP; sleep 5
+  # Counted from here: the frames of the screen-off transition aren't "asleep".
+  sh_ dumpsys gfxinfo "$PKG" reset > /dev/null
   t0="$(sh_ date +%s)"
   sleep "$s"
   frames="$(sh_ dumpsys gfxinfo "$PKG" | sed -n 's/^Total frames rendered: //p')"
@@ -104,10 +105,14 @@ wifi_() {
   log "wifi-restored TV wifi enabled by the scheduled chaos.sh test"
   t0="$(( $(sh_ date +%s) - 25 ))"
   check "ticker stayed up through the outage" "$([ "$(on_screen)" -ge 1 ] || auto_mode; echo $?)"
-  sleep 20
-  check "ESPN polled again after Wi-Fi returned" "$([ "$(sh_ logcat -d -v epoch -s LumenSports:V | awk -v t="$t0" '$1 >= t && /fetched week/' | wc -l)" -ge 1 ]; echo $?)"
+  # Outside game windows the ticker polls every 15 min, so no fetch need fall in the outage; ask for one.
+  # Read from the app's status: logcat's 256 KiB buffer rotates within seconds when Wi-Fi reconnects.
+  control refresh > /dev/null; sleep 8
+  check "ESPN fetched again after Wi-Fi returned" "$([ "$(status_field lastRefresh)" -ge "${t0}000" ]; echo $?)" "espn=$(status_field espn)"
   if [ "$(status_field phone)" = true ]; then
-    check "phone listener rebound" "$([ "$(status_field phoneListening)" = true ]; echo $?)"
+    local waited=0
+    until [ "$(status_field phoneListening)" = true ] || [ $waited -ge 30 ]; do sleep 2; waited=$((waited + 2)); done
+    check "phone listener rebound" "$([ "$(status_field phoneListening)" = true ]; echo $?)" "listening ${waited} s after the checks above"
   fi
 }
 

@@ -43,7 +43,7 @@ The phone page shows only the ticker's state and settings. Scores, teams and you
 ## Updating (PC)
 
 1. `bash sports/build.sh`, then `bash scripts/sports.sh install`.
-2. Install Lumen after Sports if Lumen changed: `bash launcher/build.sh`, then `bash scripts/launcher.sh install`.
+2. Install Lumen after Sports if Lumen changed: `bash launcher/build.sh`, then `bash scripts/launcher.sh install`. Updating Lumen while it's on screen drops the TV to Amazon's home, and the script reopens Lumen. If you're on Amazon's home after an update anyway, open any app and press Home.
 3. The ESPN sign-in, settings and phone pairing survive updates. The ticker is off after an update. Phone control comes back by itself.
 
 **A failed update** (the app misbehaves):

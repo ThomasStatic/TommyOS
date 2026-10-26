@@ -16,7 +16,10 @@ import android.graphics.Typeface
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Base64
 import android.util.Log
 import java.io.ByteArrayOutputStream
@@ -51,6 +54,10 @@ class PhoneService : Service() {
     private val lock = Any()
     private var server: ServerSocket? = null
     private var acceptThread: Thread? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var bindFailures = 0
+    /** After a failed bind (the address not usable yet, say), tries the current network again. */
+    private val retryBind = Runnable { bind(currentAddress()) }
     /** Decrypted once; reloaded after pairing changes ([secretChanged]). */
     @Volatile private var cachedSecret: ByteArray? = null
     @Volatile private var secretLoaded = false
@@ -71,7 +78,12 @@ class PhoneService : Service() {
         cm.registerDefaultNetworkCallback(callback)
         networkCallback = callback
         // The callback reports the current network straight away; this covers a TV with none.
-        cm.activeNetwork?.let { cm.getLinkProperties(it) }?.let { bind(privateAddress(it)) }
+        currentAddress()?.let { bind(it) }
+    }
+
+    private fun currentAddress(): InetAddress? {
+        val cm = getSystemService(ConnectivityManager::class.java)
+        return cm.activeNetwork?.let { cm.getLinkProperties(it) }?.let { privateAddress(it) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -86,6 +98,7 @@ class PhoneService : Service() {
         instance = null
         authRef = null
         networkCallback?.let { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) }
+        handler.removeCallbacks(retryBind)
         bind(null)
         workers.shutdownNow()
         Log.i(TAG, "phone control stopped")
@@ -101,8 +114,9 @@ class PhoneService : Service() {
     }
 
     /** (Re)binds the listener to [address], or closes it for null. No-op when already bound there. */
-    private fun bind(address: InetAddress?) = synchronized(lock) {
+    private fun bind(address: InetAddress?): Unit = synchronized(lock) {
         if (server?.inetAddress == address && (address == null || server?.isClosed == false)) return@synchronized
+        handler.removeCallbacks(retryBind)
         server?.let { s -> try { s.close() } catch (_: Exception) {} }
         server = null
         state = State()
@@ -113,9 +127,13 @@ class PhoneService : Service() {
         val s = try {
             ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(address, PORT), BACKLOG) }
         } catch (e: Exception) {
-            Log.w(TAG, "phone control: can't listen on ${address.hostAddress}:$PORT: $e")
+            // Every 5 s for the first minute, then every 30 s, until it works or the network changes.
+            val delay = if (++bindFailures <= 12) RETRY_MS else RETRY_SLOW_MS
+            Log.w(TAG, "phone control: can't listen on ${address.hostAddress}:$PORT: $e; trying again in ${delay / 1000} s")
+            handler.postDelayed(retryBind, delay)
             return@synchronized
         }
+        bindFailures = 0
         server = s
         val host = "${address.hostAddress}:$PORT"
         state = State(listening = true, address = "http://$host/")
@@ -154,8 +172,31 @@ class PhoneService : Service() {
             }
             if (api.lastEvent.isNotEmpty()) Log.i(TAG, "phone: ${api.lastEvent} from $peer")
             Http.write(out, response)
+            closeGently(it)
         } catch (e: Exception) {
             Log.w(TAG, "phone: connection from $peer failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /**
+     * Closing with request bytes still unread (a refused oversized request) sends a TCP reset, which
+     * can destroy the response before the client reads it. End our side first, then discard what the
+     * client still sends, for at most [DRAIN_MS].
+     */
+    private fun closeGently(socket: Socket) {
+        try {
+            socket.shutdownOutput()
+            val input = socket.getInputStream()
+            val buf = ByteArray(1024)
+            val deadline = SystemClock.uptimeMillis() + DRAIN_MS
+            while (true) {
+                val left = deadline - SystemClock.uptimeMillis()
+                if (left <= 0) break
+                socket.soTimeout = left.toInt()
+                if (input.read(buf) < 0) break
+            }
+        } catch (_: Exception) {
+            // Timed out or reset: nothing more to do, the socket closes either way.
         }
     }
 
@@ -223,6 +264,9 @@ class PhoneService : Service() {
         private const val MAX_CLIENTS = 4
         private const val TIMEOUT_MS = 5_000
         private const val SETTLE_MS = 2_000L
+        private const val RETRY_MS = 5_000L
+        private const val DRAIN_MS = 300L
+        private const val RETRY_SLOW_MS = 30_000L
         private const val CHANNEL = "phone"
         private const val NOTIFICATION_ID = 2
         private const val PREFS = "phone"

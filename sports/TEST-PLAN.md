@@ -42,6 +42,13 @@ Afterwards: `bash scripts/soak.sh summary backup/soak/sunday-<time>` gives the n
 - Your notes contain nothing caused by the ticker.
 - The phone worked every time.
 
+## Pitfalls when testing on this TV
+
+- **Don't use `uiautomator dump`** while testing Lumen or auto mode: UiAutomation suspends other accessibility services while it runs, so Lumen's Home button service misses app switches (seen as "connected" in its log on every dump). Read focus from `dumpsys window` and look at screenshots instead.
+- **logcat rotates within seconds** when Wi-Fi reconnects (the main buffer is 256 KiB), so checks after an outage read the app's status (`lastRefresh`, `phoneListening`), not the log.
+- **Outside game windows the ticker polls every 15 min**, so a short outage may contain no fetch at all; `chaos.sh wifi` asks for a refresh afterwards instead of waiting for one.
+- **After updating Lumen** the first Home press cold-starts it (about 4 s); key presses sent before it appears land on Amazon's home.
+
 ## What only the TV can show (not automatable)
 
 - Protected video can't be screen-captured, so stutter in TSN is judged by eye. The soak does record that TSN's audio track stays started and its process alive.

@@ -4,12 +4,14 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -47,6 +49,7 @@ class SettingsActivity : Activity() {
     /** Where the row helpers add views: the list, or the Sports box while it is (re)built on its own. */
     private lateinit var into: LinearLayout
     private val sports by lazy { SportsLink(this) }
+    private val recheckSports = Runnable { sports.status(::showSports) }
     private var sportsStatus: SportsLink.Status? = null
     private var sportsLoaded = false
     private var sportsBox: LinearLayout? = null
@@ -67,7 +70,11 @@ class SettingsActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
-        root.addView(ScrollView(this).apply {
+        root.addView(object : ScrollView(this) {
+            // Scroll the focused row clear of the screen edges, where the Sports ticker draws.
+            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect): Int =
+                super.computeScrollDeltaToGetChildRectOnScreen(Rect(rect).apply { inset(0, -dp(EDGE_CLEARANCE_DP)) })
+        }.apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
             clipChildren = false
@@ -91,6 +98,11 @@ class SettingsActivity : Activity() {
             list.removeCallbacks(previewTask)
             if (key != null) list.postDelayed(previewTask, PREVIEW_DELAY_MS) else showWallpaper(prefs.wallpaper, preview = false)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        list.removeCallbacks(recheckSports)
     }
 
     override fun onDestroy() {
@@ -199,6 +211,9 @@ class SettingsActivity : Activity() {
     /** A new status from the Sports app: rebuild its rows only, keeping focus on the same row. */
     private fun showSports(status: SportsLink.Status?) {
         val box = sportsBox ?: return
+        // Just shown: the first ESPN answer comes within a second or two, so look again rather than say "Waiting".
+        list.removeCallbacks(recheckSports)
+        if (status != null && status.visible && status.espn == "unknown") list.postDelayed(recheckSports, RECHECK_MS)
         if (sportsLoaded && status == sportsStatus) return
         sportsLoaded = true
         sportsStatus = status
@@ -264,7 +279,8 @@ class SettingsActivity : Activity() {
         sports.pair(renew) { b ->
             when {
                 b == null -> sports.status(::showSports)
-                b.getBoolean("ok") -> pairing.show(b.getString("qr").orEmpty(), b.getString("address").orEmpty(), renew)
+                b.getBoolean("ok") -> pairing.show(b.getString("qr").orEmpty(), b.getString("address").orEmpty(), renew,
+                    sportsStatus?.takeIf { it.visible }?.let { if (it.top) Gravity.TOP else Gravity.BOTTOM } ?: 0)
                 else -> sports.status(::showSports) // Phone control went off or Wi-Fi dropped: the rows say so.
             }
         }
@@ -278,12 +294,13 @@ class SettingsActivity : Activity() {
     private fun sportsLine(st: SportsLink.Status): String {
         val updated = st.lastRefresh?.let { " · updated ${clock(it)}" }.orEmpty()
         val espn = when {
-            !st.signedIn || st.espn == "signed_out" -> "Not signed in to ESPN. Sign in once from the computer (see the setup guide)."
-            st.espn == "expired" -> "ESPN sign-in expired. Sign in again from the computer (see the setup guide)$updated."
-            st.espn == "unavailable" -> "ESPN isn't answering; retrying$updated."
-            st.espn == "ok" -> "ESPN connected$updated."
-            else -> "Waiting for ESPN$updated."
-        }
+            !st.signedIn || st.espn == "signed_out" -> "Not signed in to ESPN. Sign in once from the computer (see the setup guide)"
+            st.espn == "expired" -> "ESPN sign-in expired. Sign in again from the computer (see the setup guide)$updated"
+            st.espn == "unavailable" -> "ESPN isn't answering; retrying$updated"
+            st.espn == "ok" -> "ESPN connected$updated"
+            !st.enabled -> "Scores update while the ticker is on$updated"
+            else -> "Waiting for ESPN$updated"
+        }.let { if (it.endsWith(".")) it else "$it." } // "p.m." already ends the sentence
         val team = listOfNotNull(st.team, st.league?.let { "league $it" }).joinToString(" · ")
         return if (team.isEmpty()) espn else "$espn\n$team"
     }
@@ -400,6 +417,8 @@ class SettingsActivity : Activity() {
 
     private companion object {
         const val THEME_ROW = "row:theme"
+        const val EDGE_CLEARANCE_DP = 112 // a 56 dp ticker and its margin, with room to spare
+        const val RECHECK_MS = 2500L
         const val SPORTS_TOGGLE = "sports:on"
         const val SPORTS_PAIR = "sports:pair"
         val HEIGHTS = listOf(44, 48, 52, 56, 60, 64, 68, 72, 80, 88, 96)

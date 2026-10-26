@@ -196,3 +196,34 @@ The original proposal follows.
 - A Lumen settings toggle via the signature permission: on/off, opacity, top/bottom edge.
 - Optional *auto mode:* show only while TSN (or a chosen app list) is in front. Lumen's existing window-change service would send that signal: it reads package names only, not content and not input.
 - Default after reboot: off.
+
+## Release hardening (2026-10-25/26)
+
+Sports 1.0 (versionCode 2) and Lumen 2.2 (versionCode 7) on the TV: the control layer, Lumen's Sports section, the phone controller and auto mode. Design and residual risks: [SECURITY.md](SECURITY.md); setup and recovery: [SETUP.md](SETUP.md); procedure: [TEST-PLAN.md](TEST-PLAN.md).
+
+**Measured on the TV**
+| Test | Result |
+|---|---|
+| Unit tests (`sports/test.sh`) and page crypto (16 checks, same vector in Kotlin, JS, Python) | pass |
+| Audit (`sports_audit.py`), before and after tonight's fixes | 25/25: exported parts guarded, permission held only by the two Lumen apps, listener only on 10.0.0.213:8737, real cookie, SWID and pairing key absent from every log buffer and dump |
+| Phone protocol (`phone_test.py`) | 18/18 with 20 show/hide cycles (median 111 ms, max 1.1 s on the first, cold show); 17/17 in 4 later runs |
+| Phone control on, ticker off | 0 CPU ticks in 60 s, 12 MB PSS |
+| Lumen → Fantasy ticker On | on screen ~1.4 s after OK (including ADB polling), first ESPN answer 0.9 s after the window |
+| Disruptions (`chaos.sh`) | 20 toggles (RSS 104 → 118 MB, within limit); TSN → Netflix → Lumen ×2, one process, no crash; 60 s asleep: 0 requests, 0 frames, fetch on wake; force-stop: gone at once, focus kept, nothing restarted in 60 s; Wi-Fi off 60–120 s ×5: scores stayed up, fetch after return, listener rebound (once not, see below); reboot: ticker off, app-op kept, listener back |
+| Auto mode over real TSN (TSN1) | hidden on TSN's browse screens, the screensaver and Lumen; shown in TSN's player (`BellDivaTvPlaybackActivity`); hidden again after leaving it |
+| Soak, new build, 30 min over the screensaver then asleep | awake: ~30 fps, 0.04 % janky, ticker ~9 % of a core; asleep: 0 frames, ~0.05 %, 1 ESPN fetch in 30 min; no crashes; PSS 51 → 33 MB |
+| Soak, previous build, 2.5 h over Sunday Night Football (baseline) | 30 fps, 0.24 % janky, ticker 15 %, SurfaceFlinger 26 %, TSN 47 %, 35 fetches/h, 0 failures |
+
+**Fixed tonight**
+- Lumen's status line said "p.m.." and "Waiting for ESPN" until revisited; it now checks again a moment after showing and says when scores were last updated while off.
+- Focused settings rows scrolled under the ticker; the list now keeps 112 dp clear at both edges.
+- The pairing card was wider than the screen, see-through and partly under the ticker; it now fits, is opaque and sits at the edge away from the ticker.
+- Phone listener: a failed rebind is retried (every 5 s, then 30 s). In the first 120 s Wi-Fi outage the listener wasn't back 45 s later; four later outages didn't reproduce it, and the log had rotated.
+- The listener closes gently after refusing a request, so the refusal isn't lost to a TCP reset.
+- `launcher.sh install` reopens Lumen when the update left the TV on Amazon's home.
+- Test fixes: the sleep check counted the screen-off transition; the Wi-Fi check waited for a fetch that wasn't due off-hours and read a log that rotates.
+
+**Not measured yet**
+- The iPhone: scanning, Add to Home Screen keeping the pairing, and how fast it feels on the couch.
+- A full Sunday of the new build over live games (the TEST-PLAN procedure), including real scoring alerts and auto mode across TSN channel changes.
+- Note on numbers: the soak summary counts a sleeping TV as "shown" (the window exists), and per-app network counters are flushed in batches, so short windows mix in earlier traffic; fetch counts come from the ticker's own log.
