@@ -20,8 +20,8 @@ android {
         applicationId = "app.lumen.sports"
         minSdk = 26
         targetSdk = 30 // matches Fire OS 8 (Android 11)
-        versionCode = 1
-        versionName = "0.1-poc"
+        versionCode = 2
+        versionName = "1.0"
     }
 
     signingConfigs {

@@ -1,10 +1,12 @@
 package app.lumen.home
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -14,6 +16,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.ImageView
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * Fire OS ignores the default-home setting and always shows Amazon's launcher on Home.
@@ -29,6 +32,10 @@ import java.io.File
  * To hide Amazon's home during that wait, a cover (Lumen's wallpaper) is drawn in an
  * accessibility overlay: no extra permission, never focusable or touchable, removed as soon as
  * Lumen or another window appears, and always within [COVER_MAX_MS].
+ *
+ * Lumen Sports' auto mode: while its ticker runs in auto mode it asks (through [SportsFollowReceiver])
+ * to be told which app is in front, and this service passes on each change of package/activity name,
+ * nothing else, off the main thread. When Sports hasn't asked, nothing is sent and Sports isn't woken.
  */
 class HomeRedirectService : AccessibilityService() {
     private lateinit var prefs: Prefs
@@ -39,6 +46,9 @@ class HomeRedirectService : AccessibilityService() {
     private var cover: View? = null
     private var coverBitmap: Bitmap? = null
     private var coverStamp = 0L
+    /** The last real foreground window (package/class), and the last one passed to Lumen Sports. */
+    private var lastForeground: String? = null
+    private var sentForeground: String? = null
 
     private val redirect = Runnable {
         pending = false
@@ -51,6 +61,7 @@ class HomeRedirectService : AccessibilityService() {
 
     override fun onServiceConnected() {
         prefs = Prefs(this)
+        instance = this
         Log.i(TAG, "connected")
     }
 
@@ -62,6 +73,7 @@ class HomeRedirectService : AccessibilityService() {
         if (pkg in TRANSIENT_WINDOWS) return
         // Our own cover window reports itself too (as android.widget.ImageView); only Lumen's activities count.
         if (pkg == packageName && !cls.startsWith("$packageName.")) return
+        reportForeground("$pkg/$cls")
         val isHome = pkg == AMAZON_LAUNCHER && (cls.endsWith(".HomeActivity_vNext") || cls.endsWith(".HomeActivity"))
         if (!isHome) {
             // Another real window took over (Settings, an app, Lumen itself): don't redirect.
@@ -90,6 +102,7 @@ class HomeRedirectService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        instance = null
         handler.removeCallbacks(redirect)
         hideCover(fade = false)
         super.onDestroy()
@@ -140,6 +153,24 @@ class HomeRedirectService : AccessibilityService() {
         return coverBitmap
     }
 
+    /** Passes a foreground change to Lumen Sports if it asked for them; it answers whether to keep going. */
+    private fun reportForeground(foreground: String) {
+        lastForeground = foreground
+        if (!File(filesDir, FOLLOW_FILE).exists()) { sentForeground = null; return }
+        if (foreground == sentForeground) return
+        sentForeground = foreground
+        val app = applicationContext
+        sports.execute {
+            val keep = try {
+                app.contentResolver.call(SPORTS_CONTROL, "foreground", foreground, null)?.getBoolean("follow") ?: false
+            } catch (e: Exception) {
+                Log.w(TAG, "sports unreachable: ${e.javaClass.simpleName}")
+                false
+            }
+            if (!keep) File(app.filesDir, FOLLOW_FILE).delete()
+        }
+    }
+
     private fun windowManager() = getSystemService(WINDOW_SERVICE) as WindowManager
 
     companion object {
@@ -152,7 +183,28 @@ class HomeRedirectService : AccessibilityService() {
         private const val COVER_MAX_MS = 3000L
         private const val COVER_FADE_MS = 180L
         private const val COVER_FALLBACK = 0xFF05070D.toInt()
-        /** System overlays that change windows without the user leaving where they are. */
-        private val TRANSIENT_WINDOWS = setOf("android", "com.android.systemui", "com.amazon.tv.ime")
+        /**
+         * Overlays that change windows without the user leaving where they are: system UI, the keyboard,
+         * and the Lumen Sports ticker (appearing during the settle must not cancel a Home redirect).
+         */
+        private val TRANSIENT_WINDOWS = setOf("android", "com.android.systemui", "com.amazon.tv.ime", "app.lumen.sports")
+        private const val FOLLOW_FILE = "sports_follow"
+        private val SPORTS_CONTROL: Uri = Uri.parse("content://app.lumen.sports.control")
+        private val sports = Executors.newSingleThreadExecutor()
+        @Volatile private var instance: HomeRedirectService? = null
+
+        /**
+         * Lumen Sports starts or stops wanting foreground changes (auto mode). A marker file, like the
+         * redirect switch; on start the current app is sent at once so the ticker can decide now.
+         */
+        fun setFollowSports(context: Context, on: Boolean) {
+            val f = File(context.filesDir, FOLLOW_FILE)
+            if (on) f.createNewFile() else f.delete()
+            val s = instance ?: return
+            s.handler.post {
+                s.sentForeground = null
+                s.lastForeground?.let { if (on) s.reportForeground(it) }
+            }
+        }
     }
 }

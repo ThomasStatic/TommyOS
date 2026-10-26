@@ -37,17 +37,19 @@ class AuthProvider : ContentProvider() {
                     return result(RESULT_REJECTED)
                 }
                 creds.save(Credentials.Value(league, s2, swid.uppercase()))
+                Sports.saveEspnState(context, EspnState.UNKNOWN)
                 Log.i(TAG, "auth saved for league $league")
             }
             METHOD_SIGN_OUT -> {
                 creds.clear()
                 TickerService.cache(context).clear()
+                Sports.saveEspnState(context, EspnState.SIGNED_OUT)
                 Log.i(TAG, "signed out")
             }
             else -> return result(RESULT_REJECTED)
         }
         // A running ticker picks the change up immediately; this never starts one.
-        TickerService.refreshIfRunning(context)
+        TickerService.sendIfRunning(context, TickerService.ACTION_REFRESH)
         return result(RESULT_SAVED)
     }
 

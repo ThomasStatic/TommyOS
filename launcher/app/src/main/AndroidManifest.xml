@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Deliberately requests no permissions: Lumen has no network access and reads no personal data. -->
+<!-- Lumen has no network access and reads no personal data. Its one permission is signature-only: it lets
+     Lumen switch the Lumen Sports ticker (a separate app signed with the same key), nothing else. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Defined by Lumen Sports too (same key), so either app may be installed first. -->
+    <permission
+        android:name="app.lumen.sports.permission.CONTROL"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="app.lumen.sports.permission.CONTROL" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -9,6 +16,8 @@
     <queries>
         <!-- Amazon's launcher hosts the Settings screen Lumen opens directly. -->
         <package android:name="com.amazon.tv.launcher" />
+        <!-- Lumen Sports, for its settings section. -->
+        <package android:name="app.lumen.sports" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -50,6 +59,13 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
+
+        <!-- Lumen Sports (same key only) switches app-change reports for its auto mode on and off. -->
+        <receiver
+            android:name=".SportsFollowReceiver"
+            android:exported="true"
+            android:process=":redirect"
+            android:permission="app.lumen.sports.permission.CONTROL" />
 
         <!-- Brings Lumen forward when Amazon's home screen appears (Fire OS ignores default-home). -->
         <service

@@ -18,8 +18,8 @@ android {
         applicationId = "app.lumen.home"
         minSdk = 25
         targetSdk = 30 // matches Fire OS 8 (Android 11)
-        versionCode = 6
-        versionName = "2.1"
+        versionCode = 7
+        versionName = "2.2"
     }
 
     signingConfigs {

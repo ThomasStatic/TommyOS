@@ -102,3 +102,6 @@ java.lang.SecurityException: Cannot disable a protected package: com.amazon.ftva
 2026-10-25T19:34:20-04:00 wifi-restored TV wifi enabled by the scheduled retest
 2026-10-25T19:34:31-04:00 reboot TV (restart test)
 2026-10-25T19:39:14-04:00 install app.lumen.sports b4cfb35d22f088c8
+2026-10-25T23:43:42-04:00 install app.lumen.sports 7812a8f9b0fda023
+2026-10-25T23:43:45-04:00 install app.lumen.home 680db9b57eb40b57
+2026-10-25T23:44:02-04:00 phone app.lumen.sports on
