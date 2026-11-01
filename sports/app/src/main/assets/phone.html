@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lumen Sports">
+<meta name="theme-color" content="#000000">
+<meta name="referrer" content="no-referrer">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="/icon.png">
+<title>Lumen Sports</title>
+<!--
+  Lumen Sports phone controller. Served by the TV (app.lumen.sports PhoneService) on the local network.
+  The pairing key arrives in this page's URL fragment (#k=...) from the QR code on the TV; browsers never
+  send fragments, and the key is only ever used to sign requests (HMAC-SHA256), never sent itself.
+  Plain HTTP on the LAN: Safari treats it as an insecure context (no Web Crypto), hence the SHA-256 below.
+-->
+<style>
+  :root {
+    --bg: #000;
+    --card: rgba(28, 28, 32, 0.72);
+    --card-stroke: rgba(255, 255, 255, 0.08);
+    --text: #f5f5f7;
+    --text-2: rgba(245, 245, 247, 0.7);
+    --text-3: rgba(245, 245, 247, 0.5);
+    --pill: #f2f2f4;
+    --on-pill: #141416;
+    --chip: rgba(255, 255, 255, 0.12);
+    --chip-press: rgba(255, 255, 255, 0.2);
+    --live: #e5484d;
+    --gold: #e3b341;
+    --ok: #46c37b;
+    --blue: #8fb8ff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    min-height: 100vh;
+    padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 28px);
+    background:
+      radial-gradient(120% 60% at 50% -10%, rgba(120, 130, 160, 0.22), transparent 60%),
+      radial-gradient(80% 50% at 100% 110%, rgba(227, 179, 65, 0.08), transparent 60%),
+      var(--bg);
+    -webkit-user-select: none; user-select: none;
+  }
+  main { max-width: 480px; margin: 0 auto; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; margin: 8px 4px 20px; }
+  .overline { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+  h1 { font: 600 32px/1.1 -apple-system, "SF Pro Display", system-ui, sans-serif; margin: 4px 0 0; letter-spacing: -0.01em; }
+  .link { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text-2); padding-bottom: 4px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 10px rgba(70, 195, 123, 0.6); }
+  .dot.bad { background: var(--live); }
+  .card {
+    background: var(--card); border: 1px solid var(--card-stroke); border-radius: 24px;
+    padding: 20px; margin-bottom: 14px;
+    -webkit-backdrop-filter: blur(24px) saturate(140%); backdrop-filter: blur(24px) saturate(140%);
+  }
+  .state { display: flex; align-items: center; gap: 10px; font: 600 24px/1.2 -apple-system, "SF Pro Display", system-ui, sans-serif; }
+  .state .dot { width: 11px; height: 11px; }
+  .state .dot.on { background: var(--live); box-shadow: 0 0 12px rgba(229, 72, 77, 0.7); }
+  .sub { color: var(--text-2); font-size: 15px; margin-top: 6px; min-height: 20px; }
+  button {
+    font: inherit; color: inherit; border: 0; cursor: pointer; touch-action: manipulation;
+    transition: transform 0.12s ease, background-color 0.2s ease, opacity 0.2s ease;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.55; }
+  .primary {
+    display: block; width: 100%; height: 72px; margin-top: 18px; border-radius: 20px;
+    font-size: 21px; font-weight: 600; background: var(--pill); color: var(--on-pill);
+  }
+  .primary.off { background: var(--chip); color: var(--text); }
+  .label { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; margin: 0 0 12px 2px; }
+  .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; background: rgba(255, 255, 255, 0.06); border-radius: 18px; }
+  .segment button { height: 52px; border-radius: 14px; font-size: 17px; font-weight: 600; background: transparent; color: var(--text-2); }
+  .segment button.sel { background: var(--pill); color: var(--on-pill); }
+  details summary {
+    list-style: none; display: flex; justify-content: space-between; align-items: center;
+    font-size: 17px; font-weight: 600; min-height: 32px; cursor: pointer;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary .chev { color: var(--text-3); transition: transform 0.2s ease; font-size: 20px; }
+  details[open] summary .chev { transform: rotate(90deg); }
+  .row { display: flex; align-items: center; justify-content: space-between; min-height: 60px; border-top: 1px solid var(--card-stroke); }
+  details .row:first-of-type { margin-top: 12px; }
+  .row .name { font-size: 17px; }
+  .row .name small { display: block; color: var(--text-3); font-size: 13px; }
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .stepper button { width: 46px; height: 46px; border-radius: 50%; background: var(--chip); font-size: 24px; line-height: 1; }
+  .stepper button:active { background: var(--chip-press); }
+  .stepper output { min-width: 72px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .foot { color: var(--text-3); font-size: 14px; text-align: center; margin-top: 18px; line-height: 1.5; }
+  .notice { display: none; }
+  .notice.show { display: block; }
+  .notice h2 { font: 600 21px/1.25 -apple-system, system-ui, sans-serif; margin: 0 0 8px; }
+  .notice p { margin: 6px 0; color: var(--text-2); font-size: 15px; }
+  .notice ol { margin: 10px 0 0; padding-left: 22px; color: var(--text-2); font-size: 15px; }
+  .notice li { margin: 6px 0; }
+  .notice .primary { height: 56px; font-size: 18px; }
+  .warn { border-color: rgba(227, 179, 65, 0.35); }
+  .warn h2 { color: var(--gold); }
+  #controls.hidden { display: none; }
+  #controls.stale { opacity: 0.4; pointer-events: none; transition: opacity 0.3s ease; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translate(-50%, calc(100% + 48px));
+    opacity: 0; visibility: hidden;
+    background: rgba(242, 242, 244, 0.96); color: var(--on-pill); padding: 13px 20px; border-radius: 999px;
+    font-weight: 600; font-size: 16px; display: flex; gap: 8px; align-items: center; white-space: nowrap;
+    transition: transform 0.3s cubic-bezier(.2, .9, .3, 1.2), opacity 0.2s ease, visibility 0s linear 0.3s;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition: transform 0.3s cubic-bezier(.2, .9, .3, 1.2), opacity 0.2s ease; }
+  .toast.err { background: rgba(229, 72, 77, 0.96); color: #fff; }
+  .spin { width: 18px; height: 18px; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: s 0.7s linear infinite; vertical-align: -3px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: 2s !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="overline">Lumen Sports</div>
+      <h1>Fantasy ticker</h1>
+    </div>
+    <div class="link"><span class="dot" id="linkDot"></span><span id="linkText">Connecting…</span></div>
+  </header>
+
+  <section class="card notice warn" id="unpaired">
+    <h2>Pair this phone</h2>
+    <p>This page needs the pairing code from your TV.</p>
+    <ol>
+      <li>On the TV, open Lumen → Settings → Sports → <b>Pair a phone</b>.</li>
+      <li>Point your iPhone's Camera at the code and tap the link.</li>
+    </ol>
+  </section>
+
+  <section class="card notice warn" id="offline">
+    <h2>Can't reach the TV</h2>
+    <p>Make sure the TV is on and this phone is on the same Wi-Fi. If the TV's address changed, pair again from Lumen → Settings → Sports.</p>
+    <button class="primary off" id="retry">Try again</button>
+  </section>
+
+  <section class="card notice" id="install">
+    <h2>Keep it one tap away</h2>
+    <p>Tap <b>Share</b>, then <b>Add to Home Screen</b>. It opens straight to these controls.</p>
+  </section>
+
+  <div id="controls" class="hidden">
+    <section class="card">
+      <div class="state"><span class="dot" id="stateDot"></span><span id="stateText">—</span></div>
+      <div class="sub" id="stateSub"></div>
+      <button class="primary" id="toggle" disabled>—</button>
+    </section>
+
+    <section class="card">
+      <div class="label">Show it</div>
+      <div class="segment" role="radiogroup">
+        <button id="always" role="radio">Always</button>
+        <button id="auto" role="radio">TSN games</button>
+      </div>
+      <div class="label" style="margin-top: 18px">Position</div>
+      <div class="segment" role="radiogroup">
+        <button id="top" role="radio">Top</button>
+        <button id="bottom" role="radio">Bottom</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <details id="adjust">
+        <summary>Adjust <span class="chev">›</span></summary>
+        <div class="row"><div class="name">Height</div><div class="stepper" data-key="height"><button aria-label="Smaller">−</button><output></output><button aria-label="Larger">+</button></div></div>
+        <div class="row"><div class="name">Background</div><div class="stepper" data-key="opacity"><button aria-label="Lighter">−</button><output></output><button aria-label="Darker">+</button></div></div>
+        <div class="row"><div class="name">Crawl speed</div><div class="stepper" data-key="speed"><button aria-label="Slower">−</button><output></output><button aria-label="Faster">+</button></div></div>
+        <div class="row"><div class="name">Score alerts<small>Seconds on screen</small></div><div class="stepper" data-key="alert"><button aria-label="Shorter">−</button><output></output><button aria-label="Longer">+</button></div></div>
+      </details>
+    </section>
+
+    <div class="foot" id="foot"></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+/*crypto-begin*/
+// SHA-256 and HMAC-SHA256 (FIPS 180-4, RFC 2104) over Uint8Arrays.
+var LumenCrypto = (function () {
+  var K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+  function ror(x, n) { return (x >>> n) | (x << (32 - n)); }
+  function sha256(bytes) {
+    var len = bytes.length, total = ((len + 9 + 63) >> 6) << 6;
+    var m = new Uint8Array(total);
+    m.set(bytes);
+    m[len] = 0x80;
+    var dv = new DataView(m.buffer);
+    dv.setUint32(total - 8, Math.floor(len / 0x20000000));
+    dv.setUint32(total - 4, (len << 3) >>> 0);
+    var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    var w = new Uint32Array(64);
+    for (var o = 0; o < total; o += 64) {
+      for (var i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+      for (i = 16; i < 64; i++) {
+        var a = w[i - 15], b = w[i - 2];
+        w[i] = (w[i - 16] + (ror(a, 7) ^ ror(a, 18) ^ (a >>> 3)) + w[i - 7] + (ror(b, 17) ^ ror(b, 19) ^ (b >>> 10))) | 0;
+      }
+      var A = h[0], B = h[1], C = h[2], D = h[3], E = h[4], F = h[5], G = h[6], H = h[7];
+      for (i = 0; i < 64; i++) {
+        var t1 = (H + (ror(E, 6) ^ ror(E, 11) ^ ror(E, 25)) + ((E & F) ^ (~E & G)) + K[i] + w[i]) | 0;
+        var t2 = ((ror(A, 2) ^ ror(A, 13) ^ ror(A, 22)) + ((A & B) ^ (A & C) ^ (B & C))) | 0;
+        H = G; G = F; F = E; E = (D + t1) | 0; D = C; C = B; B = A; A = (t1 + t2) | 0;
+      }
+      h = [(h[0] + A) | 0, (h[1] + B) | 0, (h[2] + C) | 0, (h[3] + D) | 0, (h[4] + E) | 0, (h[5] + F) | 0, (h[6] + G) | 0, (h[7] + H) | 0];
+    }
+    var out = new Uint8Array(32), odv = new DataView(out.buffer);
+    for (i = 0; i < 8; i++) odv.setUint32(i * 4, h[i] >>> 0);
+    return out;
+  }
+  function concat(a, b) { var r = new Uint8Array(a.length + b.length); r.set(a); r.set(b, a.length); return r; }
+  function hmac(key, msg) {
+    if (key.length > 64) key = sha256(key);
+    var k = new Uint8Array(64); k.set(key);
+    var ipad = new Uint8Array(64), opad = new Uint8Array(64);
+    for (var i = 0; i < 64; i++) { ipad[i] = k[i] ^ 0x36; opad[i] = k[i] ^ 0x5c; }
+    return sha256(concat(opad, sha256(concat(ipad, msg))));
+  }
+  function utf8(s) { return new TextEncoder().encode(s); }
+  function hex(b) { var s = ""; for (var i = 0; i < b.length; i++) s += (b[i] < 16 ? "0" : "") + b[i].toString(16); return s; }
+  /** The request signature the TV checks (PhoneAuth.sign). */
+  function sign(key, method, target, time, nonce, body) {
+    return hex(hmac(key, concat(utf8("LUMEN1\n" + method + "\n" + target + "\n" + time + "\n" + nonce + "\n"), utf8(body))));
+  }
+  function fromBase64Url(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  return { sha256: sha256, hmac: hmac, sign: sign, hex: hex, utf8: utf8, fromBase64Url: fromBase64Url };
+})();
+if (typeof module !== "undefined") module.exports = LumenCrypto;
+/*crypto-end*/
+
+(function () {
+  "use strict";
+  if (typeof document === "undefined") return;
+  var C = LumenCrypto;
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = "lumen-sports-key";
+  var POLL_MS = 20000, TIMEOUT_MS = 6000;
+
+  // Never trust a broken hash function with the TV: check it against RFC 4231 test case 2 first.
+  var selfTest = C.hex(C.hmac(C.utf8("Jefe"), C.utf8("what do ya want for nothing?")))
+    === "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843";
+
+  function readKey() {
+    var m = /[#&]k=([A-Za-z0-9_-]{40,})/.exec(location.hash);
+    try {
+      if (m) { localStorage.setItem(STORE, m[1]); return C.fromBase64Url(m[1]); }
+      var saved = localStorage.getItem(STORE);
+      return saved ? C.fromBase64Url(saved) : null;
+    } catch (e) {
+      return m ? C.fromBase64Url(m[1]) : null;
+    }
+  }
+
+  var key = readKey();
+  var offset = 0;       // TV clock minus phone clock, learnt from every answer.
+  var status = null;
+  var busy = false;
+  var pollTimer = null;
+  var pending = {};     // Stepper values waiting to be sent.
+  var sendTimer = null;
+
+  function nonce() {
+    var b = new Uint8Array(18);
+    crypto.getRandomValues(b);
+    return btoa(String.fromCharCode.apply(null, b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  /** A signed request; retries once with the TV's clock if ours was too far off. */
+  function api(method, path, body, retried) {
+    var text = body ? JSON.stringify(body) : "";
+    var time = Date.now() + offset, n = nonce();
+    var headers = { "X-Lumen-Time": String(time), "X-Lumen-Nonce": n, "X-Lumen-Sig": C.sign(key, method, path, time, n, text) };
+    if (text) headers["Content-Type"] = "application/json";
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, TIMEOUT_MS);
+    var sent = Date.now();
+    return fetch(path, { method: method, headers: headers, body: text || undefined, cache: "no-store", signal: ctl.signal })
+      .then(function (r) {
+        clearTimeout(timer);
+        return r.json().catch(function () { return {}; }).then(function (j) { return { code: r.status, json: j }; });
+      }, function (e) {
+        clearTimeout(timer);
+        throw { offline: true };
+      })
+      .then(function (res) {
+        if (res.json && typeof res.json.now === "number") offset = res.json.now - Math.round((sent + Date.now()) / 2);
+        if (res.code === 200) return res.json;
+        if (res.code === 401 && res.json.error === "stale" && !retried) return api(method, path, body, true);
+        throw { code: res.code, error: res.json && res.json.error };
+      });
+  }
+
+  function show(id, on) { $(id).classList.toggle("show", on); }
+
+  function setLink(kind, text) {
+    $("linkDot").className = "dot" + (kind ? " " + kind : "");
+    $("linkText").textContent = text;
+  }
+
+  function clock(ms) {
+    var d = new Date(ms), time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return d.toDateString() === new Date().toDateString() ? time : d.toLocaleDateString([], { weekday: "short" }) + " " + time;
+  }
+
+  function espnLine(s) {
+    var at = s.lastRefresh ? " · updated " + clock(s.lastRefresh) : "";
+    switch (s.espn) {
+      case "ok": return "ESPN connected" + at;
+      case "expired": return "ESPN sign-in expired — sign in again from the computer" + at;
+      case "signed_out": return "Not signed in to ESPN";
+      case "unavailable": return "ESPN isn't answering, retrying" + at;
+      default:
+        if (!s.signedIn) return "Not signed in to ESPN";
+        return (s.enabled ? "Waiting for ESPN" : "Scores update while the ticker is on") + at;
+    }
+  }
+
+  var FORMAT = {
+    height: function (v) { return v === 56 ? "56 · std" : String(v); },
+    opacity: function (v) { return Math.round(v * 100) + "%"; },
+    speed: function (v) { return v === 60 ? "60 · std" : String(v); },
+    alert: function (v) { return v === 0 ? "Off" : v + " s"; }
+  };
+  var STEPS = {
+    height: [44, 48, 52, 56, 60, 64, 68, 72, 80, 88, 96],
+    opacity: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    speed: [30, 45, 60, 75, 90, 120],
+    alert: [0, 3, 5, 8, 10, 15]
+  };
+
+  function render(s) {
+    status = s;
+    $("controls").classList.remove("hidden");
+    $("controls").classList.remove("stale");
+    show("offline", false);
+    setLink("ok", "Connected");
+    var on = s.enabled;
+    $("stateDot").className = "dot" + (s.visible ? " on" : "");
+    $("stateText").textContent = s.visible ? "On screen" : on ? (s.auto ? "On · waiting for TSN" : "On · not showing") : "Off";
+    $("stateSub").textContent = (s.edge === "top" ? "Top" : "Bottom") + " of the screen · " + espnLine(s);
+    var t = $("toggle");
+    if (!busy) {
+      t.disabled = false;
+      t.textContent = on ? "Hide ticker" : "Show ticker";
+      t.className = "primary" + (on ? " off" : "");
+    }
+    $("always").classList.toggle("sel", !s.auto);
+    $("auto").classList.toggle("sel", !!s.auto);
+    $("always").setAttribute("aria-checked", !s.auto);
+    $("auto").setAttribute("aria-checked", !!s.auto);
+    $("top").classList.toggle("sel", s.edge === "top");
+    $("bottom").classList.toggle("sel", s.edge !== "top");
+    $("top").setAttribute("aria-checked", s.edge === "top");
+    $("bottom").setAttribute("aria-checked", s.edge !== "top");
+    Array.prototype.forEach.call(document.querySelectorAll(".stepper"), function (el) {
+      var k = el.dataset.key;
+      var v = k in pending ? pending[k] : s[k];
+      el.querySelector("output").textContent = FORMAT[k](v);
+    });
+    $("foot").textContent = "TV at " + location.host.replace(/:\d+$/, "") + " · nothing about your league leaves the TV";
+  }
+
+  var toastTimer = null;
+  function toast(text, err) {
+    var el = $("toast");
+    el.innerHTML = "";
+    el.appendChild(document.createTextNode((err ? "" : "✓  ") + text));
+    el.className = "toast show" + (err ? " err" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = "toast" + (err ? " err" : ""); }, err ? 3500 : 1800);
+  }
+
+  function fail(e) {
+    if (e && e.offline) {
+      setLink("bad", "Not connected");
+      show("offline", true);
+      $("controls").classList.add("stale"); // The last known state, until the TV answers again.
+      return;
+    }
+    if (e && (e.error === "bad_signature" || e.error === "unpaired" || e.error === "malformed")) {
+      try { localStorage.removeItem(STORE); } catch (x) {}
+      key = null;
+      unpaired("This phone isn't paired with the TV any more.");
+      return;
+    }
+    if (e && e.code === 429) { toast("Too many taps — wait a moment", true); return; }
+    toast("The TV didn't accept that", true);
+  }
+
+  function unpaired(why) {
+    $("controls").classList.add("hidden");
+    show("offline", false);
+    show("install", false);
+    if (why) $("unpaired").querySelector("p").textContent = why + " Pair again:";
+    show("unpaired", true);
+    setLink("bad", "Not paired");
+    stopPolling();
+  }
+
+  function refresh() {
+    if (!key) return;
+    return api("GET", "/api/status").then(render, fail);
+  }
+
+  function command(path, body, label) {
+    busy = true;
+    var t = $("toggle");
+    t.disabled = true;
+    if (path !== "/api/set") { t.innerHTML = '<span class="spin"></span>'; }
+    return api("POST", path, body).then(function (s) {
+      busy = false;
+      render(s);
+      if (label) toast(label(s));
+    }, function (e) {
+      busy = false;
+      if (status) render(status);
+      fail(e);
+    });
+  }
+
+  $("toggle").addEventListener("click", function () {
+    if (!status) return;
+    if (status.enabled) command("/api/hide", null, function (s) { return s.enabled ? "Still on" : "Ticker hidden"; });
+    else command("/api/show", null, function (s) { return s.visible ? "Ticker on screen" : s.auto ? "On — appears during TSN games" : "Ticker on — not shown yet"; });
+  });
+  $("always").addEventListener("click", function () { command("/api/set", { auto: false }, function () { return "Shows over every app"; }); });
+  $("auto").addEventListener("click", function () { command("/api/set", { auto: true }, function () { return "Shows during TSN games only"; }); });
+  $("top").addEventListener("click", function () { command("/api/set", { edge: "top" }, function () { return "Moved to the top"; }); });
+  $("bottom").addEventListener("click", function () { command("/api/set", { edge: "bottom" }, function () { return "Moved to the bottom"; }); });
+  $("retry").addEventListener("click", function () { setLink("", "Connecting…"); refresh(); });
+
+  // Steppers change the shown value at once and send it after a short pause, so a run of taps is one request.
+  Array.prototype.forEach.call(document.querySelectorAll(".stepper"), function (el) {
+    var k = el.dataset.key, buttons = el.querySelectorAll("button");
+    function step(dir) {
+      if (!status) return;
+      var list = STEPS[k], cur = k in pending ? pending[k] : status[k];
+      var i = 0, best = Infinity;
+      list.forEach(function (v, j) { var d = Math.abs(v - cur); if (d < best) { best = d; i = j; } });
+      i = Math.max(0, Math.min(list.length - 1, i + dir));
+      pending[k] = list[i];
+      el.querySelector("output").textContent = FORMAT[k](list[i]);
+      clearTimeout(sendTimer);
+      sendTimer = setTimeout(function () {
+        var body = pending;
+        pending = {};
+        command("/api/set", body, function () { return "Saved"; });
+      }, 450);
+    }
+    buttons[0].addEventListener("click", function () { step(-1); });
+    buttons[1].addEventListener("click", function () { step(1); });
+  });
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(function () { if (!busy) refresh(); }, POLL_MS);
+  }
+  function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+
+  // Only while the page is on screen: no requests from a phone in a pocket.
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) stopPolling();
+    else if (key) { refresh(); startPolling(); }
+  });
+
+  // A new pairing link opened in this same page (only the fragment changes): start over with its key.
+  window.addEventListener("hashchange", function () { if (/#k=/.test(location.hash)) location.reload(); });
+
+  if (!selfTest) {
+    unpaired("This browser computed a wrong signature, so it can't control the TV.");
+    return;
+  }
+  if (!key) { unpaired(); return; }
+  var standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+  show("install", !standalone && /#k=/.test(location.hash));
+  refresh();
+  startPolling();
+})();
+</script>
+</body>
+</html>

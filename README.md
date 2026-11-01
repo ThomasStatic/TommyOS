@@ -9,9 +9,9 @@ Findings, package classification and decisions: [PLAN.md](PLAN.md).
 |---|---|---|
 | Privacy settings (you, via Settings UI) | Device/App usage data off, interest-based ads off, autoplay off | Flip back in Settings → Preferences |
 | 23 Amazon packages | `pm disable-user --user 0` (never uninstalled) | `scripts/restore.sh` |
-| Lumen app (`app.lumen.home`) | Installed; no permissions | `scripts/restore.sh` (uninstalls) |
+| Lumen app (`app.lumen.home`) | Installed; no network access. One permission since 2.2: signature-level control of Lumen Sports (only apps signed with Lumen's key can hold it) | `scripts/restore.sh` (uninstalls) |
 | Home button | Secure settings `enabled_accessibility_services` (orig `null`) and `accessibility_enabled` (orig `0`) | `scripts/restore.sh` |
-| Lumen Sports (`app.lumen.sports`) | ESPN fantasy ticker overlay; installed with app-op `SYSTEM_ALERT_WINDOW` = `allow` (orig `default`); ESPN cookies, once `auth` runs, stored encrypted on the TV (uninstall deletes them). Off unless shown; off after reboot. See [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
+| Lumen Sports (`app.lumen.sports`) | ESPN fantasy ticker overlay; installed with app-op `SYSTEM_ALERT_WINDOW` = `allow` (orig `default`); ESPN cookies, once `auth` runs, stored encrypted on the TV (uninstall deletes them). Off unless shown; off after reboot. Optional **phone control**: a LAN page on port 8737 (off by default; signed requests, QR pairing; starts at boot only while switched on). Guide: [sports/SETUP.md](sports/SETUP.md); security: [sports/SECURITY.md](sports/SECURITY.md); findings: [sports/REPORT.md](sports/REPORT.md) | `scripts/restore.sh` (restores app-op, uninstalls) |
 
 Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinking`. Re-enabled by Fire OS at boot (left on): `com.amazon.vizzini`.
 
@@ -38,8 +38,13 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 | `scripts/restore.sh [--dry-run]` | **Full rollback** | Yes |
 | `launcher/build.sh` | Build signed Lumen APK | No (PC only) |
 | `scripts/sports.sh install\|grant\|revoke\|auth\|sign-out\|show [opacity]\|opacity <0-1>\|hide\|refresh\|status\|diag\|shot <label>\|uninstall` | Lumen Sports management, logged. `auth` sends the cookies in `sports/espn-auth.properties` (git-ignored) to the TV | Yes |
+| `scripts/sports.sh set <key> <value>... \| phone on\|off\|pair [new] [--link]\|unpair` | Ticker settings (`height`, `opacity`, `speed`, `fps`, `alert`, `edge top\|bottom`, `auto on\|off`); phone control, pairing QR code in the terminal | Yes |
+| `python scripts/sports_audit.py` | Exported components, permission holders, listening sockets, and a search of all logs and system dumps for the real cookie and pairing key | No |
+| `python scripts/phone_test.py [--cycles n]` | Phone controller from the PC: signatures, replay, limits, interface binding, show/hide cycles | Ticker toggles |
+| `scripts/soak.sh run [min] [s] [label]` | Long-run CPU, memory, frames, ESPN requests, TSN playback, crashes into `backup/soak/` with a pass/fail summary | No |
+| `scripts/chaos.sh switch\|sleep\|kill\|toggle\|wifi\|reboot\|all` | Disruption scenarios with checked outcomes (interrupts playback) | Yes |
 | `scripts/sports.sh espn-dump [dir]` | Raw ESPN responses for parser fixtures, saved outside the repo | No (PC only) |
-| `sports/build.sh`, `sports/test.sh [TestClass]` | Build the Sports APK (Lumen's signing key); run its JVM unit tests | No (PC only) |
+| `sports/build.sh`, `sports/test.sh [TestClass]` | Build the Sports APK (Lumen's signing key); run its JVM unit tests and the phone page's JavaScript tests | No (PC only) |
 
 ## Complete rollback procedure
 
@@ -52,7 +57,7 @@ Refused by Fire OS (protected): `com.amazon.diode`, `com.amazon.ftvads.deeplinki
 **If ADB is unavailable** (e.g. Developer Options reset by an update):
 - Home button: in the Lumen tile → "Show Lumen when Home is pressed" → Off (always available). Fire TV's Settings → Accessibility may also list "Lumen Home button" (not verified on this build).
 - Lumen: Settings → Applications → Manage Installed Applications → Lumen → Uninstall.
-- Lumen Sports ticker: Settings → Applications → Manage Installed Applications → Lumen Sports → Force stop (hides it until next shown) or Uninstall (also deletes its ESPN cookies).
+- Lumen Sports ticker: Lumen → Settings → Sports (Fantasy ticker Off, Phone control Off, Reset pairing); or Settings → Applications → Manage Installed Applications → Lumen Sports → Force stop (removes the ticker and the phone listener at once) or Uninstall (also deletes its ESPN cookies and pairing key).
 - Disabled packages: Settings → Applications → Manage Installed Applications → *app* → Enable (shown for most; otherwise re-enable ADB and run restore).
 - Last resort (erases everything, **only with your decision**): factory reset restores all Amazon packages and settings.
 

@@ -27,7 +27,12 @@ put_secure() {
 case "${1:-status}" in
   install)
     [ -f "$APK" ] || { echo "APK not built: run launcher/build.sh"; exit 1; }
-    "$ADB" -s "$TV" install -r "$(cygpath -w "$APK")" | tr -d '\r' && log "install $PKG $(sha256sum "$APK" | cut -c1-16)" ;;
+    "$ADB" -s "$TV" install -r "$(cygpath -w "$APK")" | tr -d '\r' && log "install $PKG $(sha256sum "$APK" | cut -c1-16)"
+    # Updating Lumen while it's on screen drops the TV to Amazon's home, which the Home button
+    # service can't catch (no window change once it's already there): bring Lumen back.
+    sleep 3
+    sh_ dumpsys window | grep -m1 mCurrentFocus | grep -q "com.amazon.tv.launcher/.*HomeActivity" && sh_ am start -n "$PKG/.HomeActivity" > /dev/null
+    true ;;
   open)
     sh_ am start -n "$PKG/.HomeActivity" ;;
   enable-redirect)

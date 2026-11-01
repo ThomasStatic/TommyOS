@@ -32,6 +32,10 @@ object PollPolicy {
     private const val UNKNOWN_SCHEDULE_MS = 2 * 60_000L
     private const val MAX_BACKOFF_MS = 15 * 60_000L
     private const val PREGAME_MS = 5 * 60_000L
-    /** How long an NFL game counts as under way after kickoff. Generous: overtime and long reviews fit. */
+    /**
+     * How long after kickoff an NFL game may still be under way: polling stays fast and the
+     * scoreboard is checked. Generous: overtime and long reviews fit. Without the scoreboard, a game
+     * counts as live for all of it.
+     */
     const val GAME_MS = 4 * 3600_000L
 }

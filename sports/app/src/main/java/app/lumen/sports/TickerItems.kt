@@ -4,81 +4,83 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToLong
 
 /**
- * One line of ticker text; [emphasis] lines (your matchup, status messages) are drawn brighter and
- * bolder. [newPage] starts a new ticker page even if the line would fit on the current one.
- */
-data class TickerItem(val text: String, val emphasis: Boolean = false, val newPage: Boolean = false)
-
-/**
- * Turns a [Snapshot] into the lines the ticker pages through: your matchup with full team names,
- * then both teams' starters grouped live, played, to play and on a bye (one page or more per group), then
- * the rest of the league abbreviated.
+ * Turns a [Snapshot] into [TickerContent]: your matchup for the pinned board, then the crawl, which
+ * has both teams' starters grouped live, still to play, played and on a bye (yours before your
+ * opponent's), then the rest of the league.
  */
 object TickerItems {
-    /** [staleAfterMs]: age past which the scores say when they are from; the service ties it to its poll cadence. */
-    fun from(snapshot: Snapshot, now: Instant, zone: ZoneId, staleAfterMs: Long = STALE_MS): List<TickerItem> {
-        val items = ArrayList<TickerItem>()
+    /** A problem to show: [text] in place of the scores when there are none, [short] in the status pill beside them. */
+    data class Notice(val text: String, val short: String)
+
+    /** [staleAfterMs]: age past which the status pill says when the scores are from; the service ties it to its poll cadence. */
+    fun from(snapshot: Snapshot?, notice: Notice?, now: Instant, zone: ZoneId, staleAfterMs: Long = STALE_MS): TickerContent {
+        if (snapshot == null) return TickerContent(null, listOf(Segment(entries = listOf(Entry(notice?.text ?: LOADING)))))
         val m = snapshot.mine
-        items += TickerItem("Week ${snapshot.week}   " + if (m == null) "No matchup this week" else "${score(m, full = true)}${status(m)}", emphasis = true)
-        if (m != null) for (game in GROUPS) {
-            val start = items.size
-            for (side in listOf(m.left, m.right)) {
-                side.starters.filter { it.game == game }.chunked(PLAYERS_PER_ITEM).forEach { group ->
-                    items += TickerItem("${side.abbrev} ${LABELS.getValue(game)}   " + group.joinToString(SEPARATOR) { player(it) })
-                }
+        val crawl = ArrayList<Segment>()
+        if (m == null) crawl += Segment("WEEK ${snapshot.week}", entries = listOf(Entry("No matchup this week")))
+        else for (game in GROUPS) {
+            var heading: String? = LABELS.getValue(game)
+            for ((side, mine) in listOf(m.left to true, m.right to false)) {
+                val players = side.starters.filter { it.game == game }
+                if (players.isEmpty()) continue
+                crawl += Segment(heading, Chip(side.abbrev, mine), players.map(::entry), live = heading != null && game == Game.LIVE)
+                heading = null // Once per group; the team chips separate the two sides.
             }
-            if (items.size > start) items[start] = items[start].copy(newPage = true)
         }
         // Other matchups skip projections to stay short.
-        snapshot.others.forEachIndexed { i, o -> items += TickerItem(score(o) + if (o.final) "   Final" else "", newPage = i == 0) }
-        if (items.isNotEmpty() && now.toEpochMilli() - snapshot.fetchedAt > staleAfterMs) {
-            val at = TIME.format(Instant.ofEpochMilli(snapshot.fetchedAt).atZone(zone)).lowercase(Locale.ROOT)
-            items[0] = items[0].copy(text = "${items[0].text}   as of $at")
-        }
-        return items
+        if (snapshot.others.isNotEmpty()) crawl += Segment("LEAGUE", entries = snapshot.others.map { o ->
+            Entry("${o.left.abbrev} ${pts(o.left.points)} – ${pts(o.right.points)} ${o.right.abbrev}", tag = if (o.final) "FINAL" else "")
+        })
+        val stale = now.toEpochMilli() - snapshot.fetchedAt > staleAfterMs
+        val status = if (stale || notice != null) {
+            val at = TIME.format(Instant.ofEpochMilli(snapshot.fetchedAt).atZone(zone))
+            listOfNotNull(notice?.short, "as of $at").joinToString(" · ").uppercase(Locale.ROOT)
+        } else null
+        return TickerContent(m?.let(::board), crawl, status)
     }
 
     /**
-     * "Josh Allen", "QB" -> "J. Allen QB 21.4"; a defence's name already says D/ST, so it isn't
-     * repeated. Players still to play show their projection instead of their (zero) points; players
-     * on a bye show neither.
+     * "Josh Allen", "QB" -> "J. Allen" tagged "QB"; a defence's name already says D/ST, so it isn't
+     * repeated.
      */
-    private fun player(p: PlayerLine): String {
-        val parts = p.name.trim().split(' ', limit = 2)
-        val who = when {
-            p.name.endsWith(p.position) -> p.name
-            parts.size == 2 -> "${parts[0].first()}. ${parts[1]} ${p.position}"
-            else -> "${p.name} ${p.position}"
+    fun shortName(name: String, position: String): Pair<String, String> {
+        val parts = name.trim().split(' ', limit = 2)
+        return when {
+            name.endsWith(position) -> name to ""
+            parts.size == 2 -> "${parts[0].first()}. ${parts[1]}" to position
+            else -> name to position
         }
+    }
+
+    fun pts(value: Double) = String.format(Locale.ROOT, "%.1f", value)
+
+    /** Players still to play show their projection instead of their (zero) points; players on a bye show neither. */
+    private fun entry(p: PlayerLine): Entry {
+        val (name, position) = shortName(p.name, p.position)
         return when (p.game) {
-            Game.BYE -> who
-            Game.UPCOMING -> if (p.projected != null) "$who proj ${pts(p.projected)}" else who
-            else -> "$who ${pts(p.points)}"
+            Game.BYE -> Entry(name, position)
+            Game.UPCOMING -> Entry(name, position, p.projected?.let(::pts) ?: "", projected = p.projected != null)
+            else -> Entry(name, position, pts(p.points))
         }
     }
 
-    private fun score(m: Matchup, full: Boolean = false): String {
-        fun name(s: Side) = if (full) s.name else s.abbrev
-        return "${name(m.left)} ${pts(m.left.points)} – ${pts(m.right.points)} ${name(m.right)}"
+    private fun board(m: Matchup): Board {
+        // Compared as shown, so a lead never points at two equal-looking scores.
+        fun tenths(s: Side) = (s.points * 10).roundToLong()
+        fun team(s: Side, other: Side) = BoardTeam(s.abbrev, pts(s.points), s.projected?.takeIf { !m.final }?.let(::pts), tenths(s) > tenths(other))
+        return Board(team(m.left, m.right), team(m.right, m.left), m.final)
     }
-
-    private fun status(m: Matchup) = when {
-        m.final -> "   Final"
-        m.left.projected != null && m.right.projected != null -> "   proj ${pts(m.left.projected)} – ${pts(m.right.projected)}"
-        else -> ""
-    }
-
-    private fun pts(value: Double) = String.format(Locale.ROOT, "%.1f", value)
 
     /** Live polling refreshes every 30 s, so anything past a few misses is labelled with its time. */
     const val STALE_MS = 3 * 60_000L
+    private const val LOADING = "Loading ESPN fantasy scores…"
     private val TIME = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
-    private const val PLAYERS_PER_ITEM = 3
-    private const val SEPARATOR = "   ·   "
-    private val GROUPS = listOf(Game.LIVE, Game.PLAYED, Game.UPCOMING, Game.BYE, Game.UNKNOWN)
+    /** Players in action first, then those still to come; finished and idle ones after. */
+    private val GROUPS = listOf(Game.LIVE, Game.UPCOMING, Game.PLAYED, Game.BYE, Game.UNKNOWN)
     private val LABELS = mapOf(
-        Game.LIVE to "live", Game.PLAYED to "played", Game.UPCOMING to "to play", Game.BYE to "on bye", Game.UNKNOWN to "starters",
+        Game.LIVE to "LIVE", Game.UPCOMING to "TO PLAY", Game.PLAYED to "PLAYED", Game.BYE to "ON BYE", Game.UNKNOWN to "STARTERS",
     )
 }

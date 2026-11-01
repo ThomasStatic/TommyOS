@@ -4,12 +4,15 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
+import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -18,9 +21,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
- * Lumen's own preferences: theme, wallpaper, clock, Home button behaviour, hidden apps.
+ * Lumen's own preferences: theme, wallpaper, clock, Home button behaviour, hidden apps, and the
+ * Lumen Sports ticker when that app is installed (through [SportsLink]).
  * Wallpapers preview live: focusing a thumbnail shows it full screen behind the menu; OK keeps it.
  */
 class SettingsActivity : Activity() {
@@ -38,6 +46,14 @@ class SettingsActivity : Activity() {
     private val previewTask = Runnable { previewing?.let { showWallpaper(it, preview = true) } }
     private val density by lazy { resources.displayMetrics.density }
     private val cinema get() = look.id == ThemeId.CINEMA
+    /** Where the row helpers add views: the list, or the Sports box while it is (re)built on its own. */
+    private lateinit var into: LinearLayout
+    private val sports by lazy { SportsLink(this) }
+    private val recheckSports = Runnable { sports.status(::showSports) }
+    private var sportsStatus: SportsLink.Status? = null
+    private var sportsLoaded = false
+    private var sportsBox: LinearLayout? = null
+    private lateinit var pairing: PairingPanel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = Prefs(this)
@@ -54,7 +70,11 @@ class SettingsActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
-        root.addView(ScrollView(this).apply {
+        root.addView(object : ScrollView(this) {
+            // Scroll the focused row clear of the screen edges, where the Sports ticker draws.
+            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect): Int =
+                super.computeScrollDeltaToGetChildRectOnScreen(Rect(rect).apply { inset(0, -dp(EDGE_CLEARANCE_DP)) })
+        }.apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
             clipChildren = false
@@ -63,6 +83,10 @@ class SettingsActivity : Activity() {
             addView(list)
         }, MATCH, MATCH)
         setContentView(root)
+        pairing = PairingPanel(root, cinema) {
+            sports.status(::showSports)
+            sportsBox?.findViewWithTag<View>(SPORTS_PAIR)?.requestFocus()
+        }
         styleScreen()
         build()
         list.post { list.findViewWithTag<View>(THEME_ROW)?.requestFocus() }
@@ -74,6 +98,11 @@ class SettingsActivity : Activity() {
             list.removeCallbacks(previewTask)
             if (key != null) list.postDelayed(previewTask, PREVIEW_DELAY_MS) else showWallpaper(prefs.wallpaper, preview = false)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        list.removeCallbacks(recheckSports)
     }
 
     override fun onDestroy() {
@@ -92,6 +121,7 @@ class SettingsActivity : Activity() {
     override fun onResume() {
         super.onResume()
         showWallpaper(prefs.wallpaper, preview = false)
+        if (sportsBox != null) sports.status(::showSports)
     }
 
     /** Re-read the theme after it is switched here, so this screen restyles too. */
@@ -121,6 +151,7 @@ class SettingsActivity : Activity() {
 
     private fun build() {
         list.removeAllViews()
+        into = list
         recycleThumbs()
         list.addView(text("Lumen", Type.TITLE, Ink.TEXT, medium = true))
         list.addView(text("Your home screen, without the ads.", Type.CAPTION, Ink.TEXT_SECONDARY).apply { setPadding(0, dp(Space.XS), 0, 0) })
@@ -156,6 +187,11 @@ class SettingsActivity : Activity() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
 
+        sportsBox = if (sports.installed) LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also {
+            list.addView(it)
+            buildSports(it)
+        } else null
+
         val hidden = prefs.hidden.sortedBy { labelOf(it).lowercase() }
         if (hidden.isNotEmpty()) {
             section("Hidden apps")
@@ -168,6 +204,136 @@ class SettingsActivity : Activity() {
         section("About")
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         note("Lumen $version · no network access · everything stays on this TV")
+    }
+
+    // --- Sports ---
+
+    /** A new status from the Sports app: rebuild its rows only, keeping focus on the same row. */
+    private fun showSports(status: SportsLink.Status?) {
+        val box = sportsBox ?: return
+        // Just shown: the first ESPN answer comes within a second or two, so look again rather than say "Waiting".
+        list.removeCallbacks(recheckSports)
+        if (status != null && status.visible && status.espn == "unknown") list.postDelayed(recheckSports, RECHECK_MS)
+        if (sportsLoaded && status == sportsStatus) return
+        sportsLoaded = true
+        sportsStatus = status
+        val focused = (currentFocus?.takeIf { box.indexOfChild(it) >= 0 }?.tag as? String)
+        buildSports(box)
+        focused?.let { box.findViewWithTag<View>(it)?.requestFocus() }
+    }
+
+    private fun buildSports(box: LinearLayout) {
+        box.removeAllViews()
+        into = box
+        section("Sports")
+        val st = sportsStatus
+        if (!sportsLoaded) {
+            note("Checking Lumen Sports…")
+            into = list
+            return
+        }
+        if (st == null) {
+            note("Lumen Sports isn't answering. If it was installed after this version of Lumen, reinstall Lumen.")
+            into = list
+            return
+        }
+        val toggle = action("Fantasy ticker", onOff(st.enabled)) {}
+        toggle.tag = SPORTS_TOGGLE
+        toggle.setOnClickListener {
+            toggle.set("Fantasy ticker", if (st.enabled) "Turning off…" else "Turning on…")
+            if (st.enabled) sports.hide(::showSports) else sports.show(::showSports)
+        }
+        note(sportsLine(st))
+        action("Show it", if (st.auto) "During TSN games" else "Always") {
+            sports.set("auto", if (st.auto) "off" else "on", ::showSports)
+        }.tag = "sports:auto"
+        if (st.auto) note(when {
+            !redirectServiceEnabled() -> "During TSN games needs the Home button service, which is off: the ticker won't appear."
+            st.enabled && !st.visible -> "On, and waiting: it appears when a TSN game is playing, and steps aside everywhere else."
+            else -> "Appears only while TSN is playing a game: not over TSN's menus or sign-in, other apps, or Fire TV settings."
+        })
+        action("Position", if (st.top) "Top" else "Bottom") {
+            sports.set("edge", if (st.top) "bottom" else "top", ::showSports)
+        }.tag = "sports:edge"
+        stepper("Height", "height", HEIGHTS, st.heightDp) { if (it == 56) "56 (standard)" else "$it" }
+        stepper("Background", "opacity", OPACITIES, Math.round(st.opacity * 100)) { "$it%" }
+        stepper("Crawl speed", "speed", SPEEDS, st.speedDp) { if (it == 60) "60 (standard)" else "$it" }
+        stepper("Score alerts", "alert", ALERTS, st.alertSeconds) { if (it == 0) "Off" else "$it s on screen" }
+        note("Left and right change a setting; OK steps through it. The ticker updates as you go.")
+
+        action("Phone control", onOff(st.phone)) { sports.setPhone(!st.phone, ::showSports) }.tag = "sports:phone"
+        when {
+            !st.phone -> note("Show, hide and move the ticker from your phone over Wi-Fi, without leaving the game.")
+            !st.phoneListening -> note("Waiting for Wi-Fi. The phone page comes back by itself when the TV is online.")
+            else -> {
+                action("Pair a phone", if (st.phonePaired) "Show code" else null) { showPairing(renew = false) }.tag = SPORTS_PAIR
+                if (st.phonePaired) action("Reset pairing", "New code") { showPairing(renew = true) }.tag = "sports:repair"
+                note(if (st.phonePaired) "Reset pairing makes a new code: phones paired before stop working until they scan it."
+                     else "Pair once, then add the page to your iPhone's Home Screen.")
+            }
+        }
+        into = list
+    }
+
+    private fun showPairing(renew: Boolean) {
+        sports.pair(renew) { b ->
+            when {
+                b == null -> sports.status(::showSports)
+                b.getBoolean("ok") -> pairing.show(b.getString("qr").orEmpty(), b.getString("address").orEmpty(), renew,
+                    sportsStatus?.takeIf { it.visible }?.let { if (it.top) Gravity.TOP else Gravity.BOTTOM } ?: 0)
+                else -> sports.status(::showSports) // Phone control went off or Wi-Fi dropped: the rows say so.
+            }
+        }
+    }
+
+    override fun onBackPressed() {
+        if (pairing.isShowing) pairing.dismiss() else super.onBackPressed()
+    }
+
+    /** ESPN connection, last update, and whose team the ticker follows. */
+    private fun sportsLine(st: SportsLink.Status): String {
+        val updated = st.lastRefresh?.let { " · updated ${clock(it)}" }.orEmpty()
+        val espn = when {
+            !st.signedIn || st.espn == "signed_out" -> "Not signed in to ESPN. Sign in once from the computer (see the setup guide)"
+            st.espn == "expired" -> "ESPN sign-in expired. Sign in again from the computer (see the setup guide)$updated"
+            st.espn == "unavailable" -> "ESPN isn't answering; retrying$updated"
+            st.espn == "ok" -> "ESPN connected$updated"
+            !st.enabled -> "Scores update while the ticker is on$updated"
+            else -> "Waiting for ESPN$updated"
+        }.let { if (it.endsWith(".")) it else "$it." } // "p.m." already ends the sentence
+        val team = listOfNotNull(st.team, st.league?.let { "league $it" }).joinToString(" · ")
+        return if (team.isEmpty()) espn else "$espn\n$team"
+    }
+
+    private fun clock(ms: Long): String {
+        val today = Calendar.getInstance().get(Calendar.DAY_OF_YEAR) == Calendar.getInstance().apply { timeInMillis = ms }.get(Calendar.DAY_OF_YEAR)
+        val time = if (prefs.use24h) "H:mm" else "h:mm a"
+        return SimpleDateFormat(if (today) time else "EEE $time", Locale.getDefault()).format(Date(ms))
+    }
+
+    /**
+     * A row that steps through [values] (OK: next, wrapping; left/right: down/up) and saves each
+     * choice as [key] in Sports. [current] picks the nearest value.
+     */
+    private fun stepper(label: String, key: String, values: List<Int>, current: Int, format: (Int) -> String) {
+        var index = values.indices.minByOrNull { Math.abs(values[it] - current) } ?: 0
+        val row = action(label, format(values[index])) {}
+        row.tag = "sports:$key"
+        fun choose(i: Int) {
+            index = i
+            row.set(label, format(values[i]))
+            val v = values[i]
+            sports.set(key, if (key == "opacity") v / 100f else v) { sportsStatus = it }
+        }
+        row.setOnClickListener { choose((index + 1) % values.size) }
+        row.setOnKeyListener { _, code, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> { if (index > 0) choose(index - 1); true }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> { if (index < values.size - 1) choose(index + 1); true }
+                else -> false
+            }
+        }
     }
 
     private fun rebuild(focusTag: String) {
@@ -216,12 +382,12 @@ class SettingsActivity : Activity() {
         pkg
     }
 
-    private fun section(title: String) = list.addView(text(title.uppercase(), Type.OVERLINE, Ink.TEXT_SECONDARY, medium = true).apply {
+    private fun section(title: String) = into.addView(text(title.uppercase(), Type.OVERLINE, Ink.TEXT_SECONDARY, medium = true).apply {
         letterSpacing = 0.12f
         setPadding(0, dp(if (cinema) 40 else 32), 0, dp(Space.S))
     })
 
-    private fun note(message: String) = list.addView(text(message, Type.CAPTION, Ink.TEXT_TERTIARY).apply {
+    private fun note(message: String) = into.addView(text(message, Type.CAPTION, Ink.TEXT_TERTIARY).apply {
         setPadding(dp(if (cinema) Space.XL else 14), dp(Space.S), 0, 0)
         maxWidth = dp(ROW_WIDTH_DP + 80)
     })
@@ -235,7 +401,7 @@ class SettingsActivity : Activity() {
         val row = MenuRow(this, cinema).set(label, value)
         row.setOnClickListener { onClick() }
         val width = if (cinema) dp(ROW_WIDTH_DP) else WRAP
-        list.addView(row, LinearLayout.LayoutParams(width, WRAP).apply { topMargin = dp(Space.XS) })
+        into.addView(row, LinearLayout.LayoutParams(width, WRAP).apply { topMargin = dp(Space.XS) })
         return row
     }
 
@@ -251,6 +417,14 @@ class SettingsActivity : Activity() {
 
     private companion object {
         const val THEME_ROW = "row:theme"
+        const val EDGE_CLEARANCE_DP = 112 // a 56 dp ticker and its margin, with room to spare
+        const val RECHECK_MS = 2500L
+        const val SPORTS_TOGGLE = "sports:on"
+        const val SPORTS_PAIR = "sports:pair"
+        val HEIGHTS = listOf(44, 48, 52, 56, 60, 64, 68, 72, 80, 88, 96)
+        val OPACITIES = listOf(40, 50, 60, 70, 80, 90, 100)
+        val SPEEDS = listOf(30, 45, 60, 75, 90, 120)
+        val ALERTS = listOf(0, 3, 5, 8, 10, 15)
         const val WP = "wp:"
         const val ROW_WIDTH_DP = 640
         const val PREVIEW_DELAY_MS = 220L
