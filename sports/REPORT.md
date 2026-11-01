@@ -213,6 +213,7 @@ Sports 1.0 (versionCode 2) and Lumen 2.2 (versionCode 7) on the TV: the control 
 | Auto mode over real TSN (TSN1) | hidden on TSN's browse screens, the screensaver and Lumen; shown in TSN's player (`BellDivaTvPlaybackActivity`); hidden again after leaving it |
 | Soak, new build, 30 min over the screensaver then asleep | awake: ~30 fps, 0.04 % janky, ticker ~9 % of a core; asleep: 0 frames, ~0.05 %, 1 ESPN fetch in 30 min; no crashes; PSS 51 → 33 MB |
 | Soak, previous build, 2.5 h over Sunday Night Football (baseline) | 30 fps, 0.24 % janky, ticker 15 %, SurfaceFlinger 26 %, TSN 47 %, 35 fetches/h, 0 failures |
+| Soak, new build, 4 h over Thursday Night Football (TSN1, 2026-10-29) | PASS. Top, auto mode, shown 74 min in TSN's player until hidden from the phone at 21:20: 30 fps, 0.29 % janky, ticker 14.2 % (p95 14.8 %), SurfaceFlinger 26 %, TSN 45 %; hidden: ticker 0.1 %. 140 fetches (35/h), 0 failures; RSS slope after warm-up −5 MB/h, PSS settled at 30 MB; one process, 0 crashes. Auto mode hid it on TSN's browse screen and showed it when the player opened. No alerts: one live player in the matchup, no scoring event detected |
 
 **Fixed tonight**
 - Lumen's status line said "p.m.." and "Waiting for ESPN" until revisited; it now checks again a moment after showing and says when scores were last updated while off.
@@ -224,6 +225,6 @@ Sports 1.0 (versionCode 2) and Lumen 2.2 (versionCode 7) on the TV: the control 
 - Test fixes: the sleep check counted the screen-off transition; the Wi-Fi check waited for a fetch that wasn't due off-hours and read a log that rotates.
 
 **Not measured yet**
-- The iPhone: scanning, Add to Home Screen keeping the pairing, and how fast it feels on the couch.
-- A full Sunday of the new build over live games (the TEST-PLAN procedure), including real scoring alerts and auto mode across TSN channel changes.
+- The iPhone was paired and used on 2026-10-29 (show, hide, position from 10.0.0.152; reported smooth). Not yet seen in a soak: Netflix, Home and sleep during a game with the new build (only the disruption run covers them).
+- A full Sunday of the new build over live games (the TEST-PLAN procedure), including real scoring alerts (none occurred on Thursday) and auto mode across TSN channel changes.
 - Note on numbers: the soak summary counts a sleeping TV as "shown" (the window exists), and per-app network counters are flushed in batches, so short windows mix in earlier traffic; fetch counts come from the ticker's own log.
